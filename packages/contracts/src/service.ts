@@ -155,6 +155,12 @@ export const operations = {
     }),
     c.Run,
   ),
+  listRuns: op(
+    "GET",
+    "/farms/:farmId/runs",
+    z.object({ conversation_id: c.Id.optional() }),
+    c.page(c.Run),
+  ),
   getRun: op("GET", "/farms/:farmId/runs/:runId", empty, c.Run),
   cancelRun: op("POST", "/farms/:farmId/runs/:runId/cancel", version, c.Run),
   resumeRun: op("POST", "/farms/:farmId/runs/:runId/resume", version, c.Run),

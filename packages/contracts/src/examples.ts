@@ -308,6 +308,7 @@ export const responseExamples: Record<c.OperationName, unknown> = {
   getConversation: conversation,
   listMessages: paged(message),
   submitTurn: { ...run, state: "queued", failure: undefined },
+  listRuns: paged(run),
   getRun: run,
   cancelRun: { ...run, state: "cancelled" },
   resumeRun: { ...run, state: "queued" },
