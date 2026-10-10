@@ -1,0 +1,28 @@
+{
+  "name": "@sakha/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "@sakha/contracts": "workspace:*",
+    "fastify": "5.12.5",
+    "@fastify/static": "10.1.6",
+    "@fastify/sse": "0.6.1",
+    "better-sqlite3": "13.0.3",
+    "drizzle-orm": "0.45.4",
+    "drizzle-kit": "0.31.11",
+    "env-paths": "4.0.0",
+    "@napi-rs/keyring": "2.1.1",
+    "@strands-agents/sdk": "1.20.0",
+    "openai": "6.49.0",
+    "@cedar-policy/cedar-wasm": "4.13.0",
+    "@cedar-policy/mcp-schema-generator-wasm": "0.6.1",
+    "@opentelemetry/api": "1.9.1",
+    "@modelcontextprotocol/client": "2.3.1",
+    "@modelcontextprotocol/server": "2.3.1",
+    "zod": "4.6.5"
+  }
+}

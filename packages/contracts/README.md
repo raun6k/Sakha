@@ -1,0 +1,13 @@
+# Sakha browser service contract
+
+Revision `sakha.v1`, 10 October 2026. Backend owns schemas and operations; frontend reviews changes before incorporation. `src/schemas.ts` has no Node dependencies; `src/service.ts` defines every REST operation and the `SakhaService` adapter interface. Both adapters validate inputs and outputs. `src/examples.ts` is visibly synthetic; it must never seed live storage.
+
+Paths in the operation register are relative to `/api/v1`. `execute` returns validated `data` from the response envelope. HTTP transport substitutes named `params`, appends validated GET inputs and cursor/limit to query parameters, and serializes mutation input as JSON. Send `X-Sakha-Session` on protected requests after origin-checked bootstrap. Send `Idempotency-Key` from `request.command.idempotency_key` on every mutation. The body contains version/base-revision checks per operation. Session token is process-local protection, not farmer authentication. Errors use `ApiError`; success uses `envelope(operation.output)`.
+
+Events use authenticated fetch SSE at `/api/v1/farms/:farmId/events`, accepting `Last-Event-ID` cursor. `id` equals durable event.cursor and `data` is JSON Event. Replay precedes live events without a subscription gap. Duplicate cursors and text batch sequences are ignored; expired/foreign cursors require `resync_required`, then canonical queries. Reconnecting never resubmits commands. Text remains partial until canonical message_final is stored. subscribe returns cancellation/disconnect callback.
+
+Plan decisions, runtime approvals, fact saves, alert acknowledgement, work confirmation and outcome recording are separate operations. Approval never records actual water/cash use. Decimal currency values use minor units; quantitative units remain explicit; bags/local area require known definitions. Only English and INR are initially supported; hectare/acre and Celsius/Fahrenheit are display choices, not regional claim gates. Source coverage, exact crop/water rule coefficients and live models remain separately verified capability gates.
+
+Scenarios cover seasonal risk, crop comparison/planting, care, water budget/allocation, sale/storage/proceeds, finance and scheme checklists. Scenario inputs are hypothetical and do not update authoritative facts. Role preferences contain presentation/interests/cadence; location/crops/water/budgets/eligibility remain shared facts and consent grants.
+
+Examples cover every operation output and each role/panel/error/event family. Missing periods are null gaps; no values are fabricated. Farm scopes and opaque IDs select resources; server ownership and Cedar authorization remain required.

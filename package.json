@@ -1,0 +1,31 @@
+{
+  "name": "sakha",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.10.1",
+  "engines": {
+    "node": ">=24.0.0 <25"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter './apps/*' dev",
+    "dev:server": "pnpm --filter @sakha/server dev",
+    "dev:web": "pnpm --filter @sakha/web dev",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "pnpm --filter @sakha/web build && tsc -p apps/server/tsconfig.build.json",
+    "start": "node apps/server/dist/apps/server/src/index.js"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "@types/better-sqlite3": "7.6.13",
+    "typescript": "7.0.2",
+    "tsx": "4.23.15",
+    "vitest": "5.0.3",
+    "@playwright/test": "1.64.0"
+  }
+}
