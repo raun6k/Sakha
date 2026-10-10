@@ -244,6 +244,18 @@ export const operations = {
     c.PlanRevision,
   ),
   listTasks: op("GET", "/farms/:farmId/tasks", empty, c.page(c.Task)),
+  getActivity: op(
+    "GET",
+    "/farms/:farmId/activities/:activityId",
+    empty,
+    c.Activity,
+  ),
+  getOutcome: op(
+    "GET",
+    "/farms/:farmId/outcomes/:outcomeId",
+    empty,
+    c.HistoryEntry,
+  ),
   recordActivity: op(
     "POST",
     "/farms/:farmId/activities",

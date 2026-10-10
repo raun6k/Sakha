@@ -369,6 +369,17 @@ export const Evidence = RecordBase.extend({
   ]),
   origin: Origin,
   hash: z.string(),
+  content_hash: z.string().optional(),
+  hash_kind: z
+    .enum([
+      "full_artifact_sha256",
+      "range_manifest_sha256",
+      "collection_manifest_sha256",
+    ])
+    .optional(),
+  source_time_precision: z
+    .enum(["exact", "date", "month", "unknown"])
+    .optional(),
   method_version: z.string(),
   citation: z.object({
     page: z.number().int().positive().optional(),
@@ -403,6 +414,7 @@ export const Series = z.object({
   points: z.array(
     z.object({
       time: Timestamp,
+      label: z.string().optional(),
       value: z.number().finite().nullable(),
       lower: z.number().finite().optional(),
       upper: z.number().finite().optional(),
