@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
-import { chmodSync, mkdirSync } from "node:fs";
+import { chmodSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Store, StoredRecord } from "@sakha/farm";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
@@ -10,6 +11,7 @@ import {
   sqliteTable,
   text,
 } from "drizzle-orm/sqlite-core";
+import { z } from "zod";
 export const records = sqliteTable(
   "records",
   {
@@ -35,14 +37,41 @@ export class Storage implements Store {
     this.db.pragma("foreign_keys = ON");
     this.db.pragma("busy_timeout = 5000");
     this.orm = drizzle(this.db, { schema: { records } });
-    this.db.exec(`CREATE TABLE IF NOT EXISTS migrations(version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
-   CREATE TABLE IF NOT EXISTS records(id TEXT NOT NULL,kind TEXT NOT NULL,farm_id TEXT NOT NULL,version INTEGER NOT NULL,payload TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(kind,id,farm_id));
-   CREATE INDEX IF NOT EXISTS records_scope ON records(farm_id,kind,created_at,id);
-   CREATE TABLE IF NOT EXISTS commands(actor TEXT NOT NULL,action TEXT NOT NULL,scope TEXT NOT NULL,key TEXT NOT NULL,fingerprint TEXT NOT NULL,result TEXT NOT NULL,PRIMARY KEY(actor,action,scope,key));
-   CREATE TABLE IF NOT EXISTS events(seq INTEGER PRIMARY KEY AUTOINCREMENT,farm_id TEXT NOT NULL,type TEXT NOT NULL,payload TEXT NOT NULL,created_at TEXT NOT NULL);
-   CREATE TABLE IF NOT EXISTS outbox(id TEXT PRIMARY KEY,farm_id TEXT NOT NULL,kind TEXT NOT NULL,payload TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'queued',attempts INTEGER NOT NULL DEFAULT 0,lease_until TEXT);
-   CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(id UNINDEXED,farm_id UNINDEXED,role_key UNINDEXED,content);
-   INSERT OR IGNORE INTO migrations VALUES(1,datetime('now'));`);
+    this.db.exec(
+      "CREATE TABLE IF NOT EXISTS migrations(version INTEGER PRIMARY KEY,checksum TEXT NOT NULL,applied_at TEXT NOT NULL)",
+    );
+    const migrationDir = fileURLToPath(
+      new URL("../../migrations/", import.meta.url),
+    );
+    try {
+      this.db.transaction(() => {
+        for (const file of readdirSync(migrationDir)
+          .filter((x) => /^\d+.*\.sql$/.test(x))
+          .sort()) {
+          const version = Number(file.split("_")[0]);
+          const sql = readFileSync(`${migrationDir}/${file}`, "utf8");
+          const checksum = createHash("sha256").update(sql).digest("hex");
+          const applied = this.db
+            .prepare("SELECT checksum FROM migrations WHERE version=?")
+            .get(version) as { checksum: string } | undefined;
+          if (applied) {
+            if (applied.checksum !== checksum)
+              throw new Error(`Migration ${version} checksum mismatch`);
+            continue;
+          }
+          this.db.exec(sql);
+          this.db
+            .prepare("INSERT INTO migrations VALUES(?,?,?)")
+            .run(version, checksum, new Date().toISOString());
+        }
+      })();
+    } catch (error) {
+      this.db.close();
+      throw new Error(
+        "Database migration failed; preserve the database and restore the matching release",
+        { cause: error },
+      );
+    }
     if (path !== ":memory:") chmodSync(path, 0o600);
   }
   get(kind: string, id: string, farmId: string): unknown {
@@ -62,19 +91,48 @@ export class Storage implements Store {
         .all(kind, farmId) as { payload: string }[]
     ).map((row) => JSON.parse(row.payload));
   }
-  put(kind: string, record: StoredRecord): void {
-    this.db
-      .prepare(
-        "INSERT INTO records VALUES(?,?,?,?,?,?) ON CONFLICT(kind,id,farm_id) DO UPDATE SET version=excluded.version,payload=excluded.payload",
-      )
-      .run(
-        record.id,
-        kind,
-        record.farm_id,
-        record.version,
-        JSON.stringify(record),
-        record.created_at,
-      );
+  put<T extends StoredRecord>(kind: string, record: T): void {
+    this.transaction(() => {
+      if (kind === "farm")
+        this.db
+          .prepare("INSERT OR IGNORE INTO scopes VALUES(?,'farm')")
+          .run(record.farm_id);
+      this.orm
+        .insert(records)
+        .values({
+          id: record.id,
+          kind,
+          farmId: record.farm_id,
+          version: record.version,
+          payload: JSON.stringify(record),
+          createdAt: record.created_at,
+        })
+        .onConflictDoUpdate({
+          target: [records.kind, records.id, records.farmId],
+          set: { version: record.version, payload: JSON.stringify(record) },
+        })
+        .run();
+      const object = z.record(z.string(), z.unknown()).parse(record);
+      const links: Record<string, string> = {
+        field_id: "field",
+        conversation_id: "conversation",
+        task_id: "task",
+        plan_revision_id: "revision",
+        base_revision_id: "revision",
+      };
+      this.db
+        .prepare(
+          "DELETE FROM record_links WHERE owner_kind=? AND owner_id=? AND farm_id=?",
+        )
+        .run(kind, record.id, record.farm_id);
+      for (const [key, targetKind] of Object.entries(links)) {
+        const target = object[key];
+        if (typeof target === "string")
+          this.db
+            .prepare("INSERT INTO record_links VALUES(?,?,?,?,?)")
+            .run(kind, record.id, record.farm_id, targetKind, target);
+      }
+    });
   }
   remove(kind: string, id: string, farmId: string): void {
     this.db

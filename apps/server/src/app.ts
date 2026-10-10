@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import * as c from "@sakha/contracts";
-import { createFarmServices, DomainError } from "@sakha/farm";
+import {
+  createDomainServices,
+  createFarmServices,
+  DomainError,
+} from "@sakha/farm";
 import Fastify from "fastify";
 import { z } from "zod";
 import { Storage } from "./storage/database.js";
@@ -8,6 +12,12 @@ export function createApp(options: { databasePath: string; logger?: boolean }) {
   const store = new Storage(options.databasePath);
   const farm = createFarmServices(store, randomUUID, () =>
     new Date().toISOString(),
+  );
+  const domain = createDomainServices(
+    store,
+    farm.makeBase,
+    farm.assertFarm,
+    () => new Date().toISOString(),
   );
   const app = Fastify({
     logger: options.logger ?? false,
@@ -63,6 +73,17 @@ export function createApp(options: { databasePath: string; logger?: boolean }) {
         );
         const perform = () => {
           if (name === "health") return { status: "ok" };
+          const domainNames = [
+            "Scenario",
+            "Finding",
+            "Plan",
+            "Task",
+            "Activity",
+            "Alert",
+            "Outcome",
+          ];
+          if (domainNames.some((part) => name.includes(part)))
+            return domain.execute(name as c.OperationName, input, params);
           return farm.execute(name as c.OperationName, input, params);
         };
         const key = request.headers["idempotency-key"];
