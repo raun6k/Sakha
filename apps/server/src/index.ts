@@ -1,19 +1,20 @@
-import Fastify from "fastify";
-export function createServer() {
-  const server = Fastify({ logger: true });
-  server.get("/api/v1/health", async () => ({
-    schema_version: "sakha.v1",
-    request_id: "health",
-    data: { status: "ok" },
-  }));
-  return server;
-}
-if (process.env.NODE_ENV !== "test") {
-  const server = createServer();
-  server
-    .listen({ host: "127.0.0.1", port: Number(process.env.SAKHA_PORT ?? 4310) })
-    .catch((error) => {
-      server.log.error(error);
+import { join } from "node:path";
+import envPaths from "env-paths";
+import { createApp } from "./app.js";
+
+const { app } = createApp({
+  databasePath:
+    process.env.SAKHA_DATABASE_PATH ??
+    join(envPaths("sakha", { suffix: "" }).data, "sakha.sqlite"),
+  logger: true,
+});
+await app.listen({
+  host: "127.0.0.1",
+  port: Number(process.env.SAKHA_PORT ?? 4310),
+});
+for (const signal of ["SIGINT", "SIGTERM"] as const)
+  process.on(signal, () => {
+    app.close().catch(() => {
       process.exitCode = 1;
     });
-}
+  });

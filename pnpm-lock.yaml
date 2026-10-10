@@ -223,6 +223,9 @@ importers:
       '@sakha/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@sakha/farm':
+        specifier: workspace:*
+        version: link:../../packages/farm
       '@strands-agents/sdk':
         specifier: 1.20.0
         version: 1.20.0(@cedar-policy/cedar-wasm@4.13.0)(@cedar-policy/mcp-schema-generator-wasm@0.6.1)(@modelcontextprotocol/client@2.3.1)(@opentelemetry/api@1.9.1)(@smithy/types@4.19.0)(openai@6.49.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(zod@4.6.5))(zod@4.6.5)
@@ -308,6 +311,15 @@ importers:
 
   packages/contracts:
     dependencies:
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
+
+  packages/farm:
+    dependencies:
+      '@sakha/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       zod:
         specifier: 4.6.5
         version: 4.6.5
