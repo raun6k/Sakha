@@ -149,6 +149,14 @@ export async function refreshClimateExtras(
           config.kind === "outlook" ? "outlook" : "probabilities",
         );
         issuedAt = parsed.issued_at;
+        if (
+          Date.parse(issuedAt) > Date.parse(retrieved) ||
+          Date.parse(retrieved) - Date.parse(issuedAt) > 40 * 86400000
+        )
+          throw new DomainError(
+            "source_stale",
+            "Forecast issue month is not current",
+          );
         baseline =
           "RONI source forecast; issued month precision, exact release time unknown";
         definition =
@@ -236,6 +244,10 @@ export async function refreshClimateExtras(
       }
       results.push({ source: config.id, status: "enabled" });
     } catch (error) {
+      services.markSourceFailure(
+        config.id,
+        error instanceof Error ? error.message : "Source fetch failed",
+      );
       results.push({
         source: config.id,
         status: "unavailable",

@@ -436,11 +436,48 @@ export function createDataServices(
   assertFarm: (farmId: string) => c.Farm,
   now: () => string,
 ) {
+  function aged<T extends c.Series | c.Source>(record: T): T {
+    return {
+      ...record,
+      freshness:
+        record.freshness.valid_until &&
+        Date.parse(record.freshness.valid_until) < Date.parse(now())
+          ? {
+              ...record.freshness,
+              status: "stale",
+              reason: "Source refresh/validity period expired",
+            }
+          : record.freshness,
+    };
+  }
   function sources() {
     return catalog.map((source) =>
-      c.Source.parse(store.get("source", source.id, "public") ?? source),
+      aged(c.Source.parse(store.get("source", source.id, "public") ?? source)),
     );
   }
+  function markSourceFailure(sourceId: string, reason: string) {
+    const source = sources().find((s) => s.id === sourceId);
+    if (source)
+      store.put("source", {
+        ...source,
+        id: sourceId,
+        farm_id: "public",
+        version: 1,
+        created_at: now(),
+        capability: {
+          key: sourceId,
+          status: "degraded",
+          reason,
+          requirements: ["Successful source refresh"],
+        },
+        freshness: {
+          ...source.freshness,
+          status: source.freshness.retrieved_at ? "stale" : "missing",
+          reason,
+        },
+      });
+  }
+
   function persistSeries(
     farmId: string,
     input: Omit<c.Series, "id" | "snapshot_id" | "evidence_id">,
@@ -476,6 +513,13 @@ export function createDataServices(
         version: 1,
         created_at: now(),
       });
+      store.put("series_projection", {
+        ...base(farmId),
+        id: createHash("sha256")
+          .update(`${series.source_id}:${series.variable}:${series.geography}`)
+          .digest("hex"),
+        series_id: series.id,
+      });
       const source = sources().find((s) => s.id === input.source_id);
       if (source)
         store.put("source", {
@@ -492,61 +536,104 @@ export function createDataServices(
       return series;
     });
   }
-  function importDocument(farmId: string, value: unknown) {
+  function importDocument(
+    farmId: string,
+    value: unknown,
+    rawArtifact?: Uint8Array,
+  ) {
     assertFarm(farmId);
     const input = DocumentImport.parse(value);
-    assertSourceUrl(input.url);
-    if (input.source_id === "M01" || input.source_id === "M02")
+    const original = rawArtifact ?? new TextEncoder().encode(input.text);
+    if (createHash("sha256").update(original).digest("hex") !== input.hash)
       throw new DomainError(
-        "unavailable",
-        "Market records require dated commodity/grade/unit validation, not generic text",
+        "validation",
+        "Original source artifact hash does not match import",
       );
-    const evidence = c.Evidence.parse({
-      ...base(farmId),
-      content_hash: createHash("sha256").update(input.text).digest("hex"),
-      hash_kind: "full_artifact_sha256",
-      source_time_precision: input.issued_at ? "date" : "unknown",
-      source_id: input.source_id,
-      snapshot_id: base("public").id,
-      title: input.title,
-      text: input.text,
-      url: input.url,
-      issued_at: input.issued_at,
-      retrieved_at: now(),
-      valid_from: input.valid_from,
-      valid_until: input.valid_until,
-      geography: input.geography,
-      kind:
-        input.source_id.startsWith("W") || input.source_id === "C07"
-          ? "forecast"
-          : "guidance",
-      origin: input.origin,
-      hash: input.hash,
-      method_version: "curated-document.v1",
-      citation: { page: input.page, section: input.section },
+    return store.transaction(() => {
+      assertSourceUrl(input.url);
+      if (input.source_id === "M01" || input.source_id === "M02")
+        throw new DomainError(
+          "unavailable",
+          "Market records require dated commodity/grade/unit validation, not generic text",
+        );
+      const evidence = c.Evidence.parse({
+        ...base(farmId),
+        content_hash: createHash("sha256").update(input.text).digest("hex"),
+        hash_kind: "full_artifact_sha256",
+        source_time_precision: input.issued_at ? "date" : "unknown",
+        source_id: input.source_id,
+        snapshot_id: base("public").id,
+        title: input.title,
+        text: input.text,
+        url: input.url,
+        issued_at: input.issued_at,
+        retrieved_at: now(),
+        valid_from: input.valid_from,
+        valid_until: input.valid_until,
+        geography: input.geography,
+        kind:
+          input.source_id.startsWith("W") || input.source_id === "C07"
+            ? "forecast"
+            : "guidance",
+        origin: input.origin,
+        hash: input.hash,
+        method_version: "curated-document.v1",
+        citation: { page: input.page, section: input.section },
+      });
+      store.put("source_snapshot", {
+        ...base("public"),
+        id: evidence.snapshot_id,
+        source_id: input.source_id,
+        hash: input.hash,
+        content_hash: evidence.content_hash,
+        method_version: evidence.method_version,
+        definition: input.definition,
+      });
+      store.put("evidence", evidence);
+      store.put("document_applicability", {
+        ...base(farmId),
+        id: evidence.id,
+        crops: input.crops,
+        definition: input.definition,
+      });
+      return evidence;
     });
-    store.put("evidence", evidence);
-    store.put("document_applicability", {
-      ...base(farmId),
-      id: evidence.id,
-      crops: input.crops,
-      definition: input.definition,
-    });
-    return evidence;
   }
   return {
     sources,
+    markSourceFailure,
     persistSeries,
     importDocument,
-    insights(farmId: string, filter?: string) {
+    insights(farmId: string, filter?: string, fieldId?: string) {
       assertFarm(farmId);
-      const series = store
-        .list("series", farmId)
-        .map((raw) => c.Series.parse(raw))
-        .filter(
-          (item) =>
-            !filter || filter === item.variable || filter === item.source_id,
+      const farm = load(store, "farm", farmId, farmId, c.Farm);
+      if (fieldId) load(store, "field", fieldId, farmId, c.Field);
+      const latest = new Map<string, c.Series>();
+      for (const raw of store.list("series_projection", farmId)) {
+        const pointer = z.object({ id: c.Id, series_id: c.Id }).parse(raw);
+        const item = c.Series.parse(
+          store.get("series", pointer.series_id, farmId),
         );
+        const evidence = load(
+          store,
+          "evidence",
+          item.evidence_id ?? "",
+          farmId,
+          c.Evidence,
+        );
+        if (evidence.field_id && evidence.field_id !== fieldId) continue;
+        if (
+          item.grid &&
+          (item.grid.latitude !== farm.location?.latitude ||
+            item.grid.longitude !== farm.location?.longitude)
+        )
+          continue;
+        latest.set(pointer.id, aged(item));
+      }
+      const series = [...latest.values()].filter(
+        (item) =>
+          !filter || filter === item.variable || filter === item.source_id,
+      );
       return c.Insights.parse({
         series,
         capabilities: sources()
@@ -583,7 +670,11 @@ export function createDataServices(
           );
         case "getInsights": {
           const filter = c.operations.getInsights.input.parse(input);
-          return this.insights(params.farmId ?? "", filter.series);
+          return this.insights(
+            params.farmId ?? "",
+            filter.series,
+            filter.field_id,
+          );
         }
         default:
           throw new DomainError("unavailable", "Data operation unavailable");
@@ -658,6 +749,10 @@ export async function refreshCoreEvidence(
     );
     results.push({ source: "C01", status: "enabled" });
   } catch (error) {
+    services.markSourceFailure(
+      "C01",
+      error instanceof Error ? error.message : "Source fetch failed",
+    );
     results.push({
       source: "C01",
       status: "unavailable",
@@ -702,7 +797,7 @@ export async function refreshCoreEvidence(
               Date.UTC(
                 current.getUTCFullYear(),
                 current.getUTCMonth(),
-                current.getUTCDate() + index + 1,
+                current.getUTCDate() + index,
               ),
             );
       const year = date.getUTCFullYear();
@@ -732,6 +827,10 @@ export async function refreshCoreEvidence(
       }
     }
     if (!grid) {
+      services.markSourceFailure(
+        source,
+        "No valid source grid sample; existing evidence retained as stale",
+      );
       results.push({
         source,
         status: "unavailable",
@@ -802,6 +901,7 @@ export async function refreshCoreEvidence(
         kind: source === "W03" ? "observation" : "forecast",
         origin: "live_source",
         hash,
+        hash_kind: "collection_manifest_sha256",
         method_version: "chirps-v3-containing-native-cell.v1",
         citation: {
           section: "CHC native grid; range artifact manifest hashes",

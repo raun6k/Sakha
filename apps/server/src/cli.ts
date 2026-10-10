@@ -52,7 +52,8 @@ try {
     );
   } else if (command === "import" && farmId && arg) {
     const input: unknown = JSON.parse(readFileSync(arg, "utf8"));
-    const record = dataServices.importDocument(farmId, input);
+    const original = extra ? readFileSync(extra) : undefined;
+    const record = dataServices.importDocument(farmId, input, original);
     if (extra) {
       const raw = readFileSync(extra);
       const hash = createHash("sha256").update(raw).digest("hex");
