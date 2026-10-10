@@ -25,7 +25,9 @@ export function InsightsPage() {
   const farmId = useFarmId();
   const [search, setSearch] = useSearchParams();
   const series = search.get("series") ?? "W03";
-  const range = search.get("range") ?? (series === "C01" ? "5years" : "30days");
+  const range =
+    search.get("range") ??
+    (series === "C01" ? "5years" : series === "W04" ? "forecast" : "12months");
   const q = useRead(
     "getInsights",
     { params: { farmId }, input: { series, range } },
@@ -57,7 +59,7 @@ export function InsightsPage() {
                     ? "5years"
                     : id === "W04"
                       ? "forecast"
-                      : "30days",
+                      : "12months",
               })
             }
           >
@@ -79,9 +81,11 @@ export function InsightsPage() {
             <option value="forecast">Actual supported forecast horizon</option>
           ) : (
             <>
-              <option value="30days">Last 30 days</option>
-              <option value="90days">Last 90 days</option>
-              <option value="season">Season</option>
+              <option value="12months">Recent 12 published months</option>
+              <option value="60months">
+                Recent five years of monthly totals
+              </option>
+              <option value="30days">Daily 30-day view (unavailable)</option>
             </>
           )}
         </select>
@@ -90,7 +94,9 @@ export function InsightsPage() {
       {q.isPending ? (
         <Loading />
       ) : q.data?.series.length ? (
-        q.data.series.map((s) => <ChartCard key={s.id} series={s} />)
+        q.data.series.map((s) => (
+          <ChartCard key={s.id} series={s} range={range} />
+        ))
       ) : (
         <Card>
           <State title="No usable series for this scope and range">

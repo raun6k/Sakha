@@ -169,11 +169,24 @@ export function EvidenceLinks({ evidence }: { evidence: EvidenceRef[] }) {
 export function ChartCard({
   series,
   compact = false,
+  range,
 }: {
   series: Series;
   compact?: boolean;
+  range?: string;
 }) {
   const [source, setSource] = useState(false);
+  const selectedRange =
+    range ??
+    (series.kind === "forecast"
+      ? "forecast"
+      : series.source_id.startsWith("C")
+        ? "5years"
+        : series.source_id.startsWith("M")
+          ? "1year"
+          : series.unit.includes("month")
+            ? "12months"
+            : "30days");
   const points = series.points;
   const values = points.flatMap((p) => (p.value === null ? [] : [p.value]));
   const max = Math.max(1, ...values);
@@ -330,14 +343,14 @@ export function ChartCard({
         {compact ? (
           <Link
             className="text-link"
-            to={`/insights?series=${encodeURIComponent(series.source_id)}&range=${series.source_id === "C01" ? "5years" : "30days"}`}
+            to={`/insights?series=${encodeURIComponent(series.source_id)}&range=${selectedRange}`}
           >
             Expand <ArrowRight size={15} />
           </Link>
         ) : (
           <Link
             className="text-link"
-            to={`/agents/${series.source_id === "C01" ? "climate" : "weather"}?tab=chat&evidence=${encodeURIComponent(series.evidence_id ?? "")}&source=${series.source_id}&snapshot=${encodeURIComponent(series.snapshot_id)}&range=${series.source_id === "C01" ? "5years" : "30days"}`}
+            to={`/agents/${series.source_id.startsWith("C") ? "climate" : series.source_id.startsWith("M") ? "market" : "weather"}?tab=chat&evidence=${encodeURIComponent(series.evidence_id ?? "")}&source=${series.source_id}&snapshot=${encodeURIComponent(series.snapshot_id)}&range=${selectedRange}`}
           >
             Ask the specialist
           </Link>

@@ -7,6 +7,7 @@ import userEvent from "@testing-library/user-event";
 import { createElement as h, StrictMode } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ChartCard } from "../components/evidence";
 import { ServiceContext } from "../services/context";
 import { createFixtureService } from "../services/fixture";
 import { useUi } from "../state/ui";
@@ -237,4 +238,23 @@ describe("evidence and privacy interactions", () => {
     ).toBeNull();
     expect(screen.getByRole("link", { name: "Ask Sakha" })).toBeTruthy();
   });
+});
+
+it("preserves published-month windows and seasonal labels in chart context", async () => {
+  const service = createFixtureService();
+  const insights = await service.execute("getInsights", {
+    params: { farmId: "fixture-farm" },
+    input: { series: "W03" },
+  });
+  const series = insights.series[0];
+  if (!series) throw new Error("Fixture series missing");
+  series.unit = "mm/month";
+  const point = series.points[0];
+  if (point) point.label = "Published October";
+  mount(h(ChartCard, { series, compact: true }), service);
+  expect(
+    screen.getByRole("link", { name: "Expand" }).getAttribute("href"),
+  ).toContain("range=12months");
+  await userEvent.setup().click(screen.getByText("Read values as a table"));
+  expect(screen.getByRole("cell", { name: "Published October" })).toBeDefined();
 });

@@ -1143,7 +1143,11 @@ const tools: Record<
           label: "Known storage costs (INR)",
           money: true,
         },
-        { key: "loss", label: "Expected losses (if known)" },
+        {
+          key: "loss",
+          label: "Expected storage loss (percent, if known)",
+          unit: "percent",
+        },
       ],
       note: "Future prices and losses are assumptions; no sale is recorded.",
     },
@@ -1154,8 +1158,12 @@ const tools: Record<
       kind: "crop_budget",
       fields: [
         { key: "crop", label: "Crop" },
-        { key: "cost", label: "Total known scenario costs (INR)", money: true },
-        { key: "input_cost", label: "Other input costs (INR)", money: true },
+        { key: "cost", label: "Base scenario costs (INR)", money: true },
+        {
+          key: "input_cost",
+          label: "Additional input costs (INR)",
+          money: true,
+        },
         { key: "labour_cost", label: "Labour costs (INR)", money: true },
         { key: "budget", label: "Spending limit (INR)", money: true },
       ],
@@ -1413,7 +1421,7 @@ function RolePanels({ role }: { role: Role }) {
   const insights = useRead(
     "getInsights",
     { params: { farmId }, input: {} },
-    Boolean(farmId) && ["climate", "weather"].includes(role.key),
+    Boolean(farmId) && ["climate", "weather", "market"].includes(role.key),
   );
   const tasks = useRead(
     "listTasks",
@@ -1425,27 +1433,55 @@ function RolePanels({ role }: { role: Role }) {
     { params: { farmId }, input: {} },
     Boolean(farmId),
   );
+  const sources = useRead(
+    "listFindings",
+    { params: { farmId }, input: { role_key: role.key } },
+    Boolean(farmId),
+  );
+  const [selectedFinding, setSelectedFinding] = useState<Finding>();
+  const prefix =
+    role.key === "climate" ? "C" : role.key === "weather" ? "W" : "M";
   const [update, setUpdate] = useState(false);
   return (
     <>
-      {["climate", "weather"].includes(role.key) ? (
+      {sources.data?.items.slice(0, 5).map((f) => (
+        <Card key={f.id} title={f.title}>
+          <Badge tone={f.origin === "fixture" ? "gold" : "neutral"}>
+            {f.origin.replaceAll("_", " ")}
+          </Badge>
+          <p>{f.summary}</p>
+          <EvidenceLinks evidence={f.evidence} />
+          <button
+            type="button"
+            className="text-link"
+            onClick={() => setSelectedFinding(f)}
+          >
+            Inspect finding and limitations
+          </button>
+        </Card>
+      ))}
+      {selectedFinding ? (
+        <FindingDetails
+          finding={selectedFinding}
+          onClose={() => setSelectedFinding(undefined)}
+        />
+      ) : null}
+      {["climate", "weather", "market"].includes(role.key) ? (
         <>
           <h2 style={{ marginBottom: 16 }}>
             {role.key === "weather"
               ? "Forecasts and rainfall timelines"
-              : "Climate history and outlook"}
+              : role.key === "market"
+                ? "Dated market price history"
+                : "Climate history and outlook"}
           </h2>
           {insights.data?.series
-            .filter((s) =>
-              role.key === "climate"
-                ? s.source_id.startsWith("C")
-                : s.source_id.startsWith("W"),
-            )
+            .filter((s) => s.source_id.startsWith(prefix))
             .map((s) => (
               <ChartCard key={s.id} series={s} />
             ))}
           {!insights.data?.series.some((s) =>
-            s.source_id.startsWith(role.key === "climate" ? "C" : "W"),
+            s.source_id.startsWith(prefix),
           ) ? (
             <Card>
               <State title="Source information unavailable">
