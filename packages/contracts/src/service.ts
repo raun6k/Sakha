@@ -380,6 +380,7 @@ export interface SakhaService {
     cursor: string | undefined,
     onEvent: (event: c.Event) => void,
     onError: (error: z.infer<typeof c.ApiError>) => void,
+    onConnection?: (state: "connecting" | "connected" | "disconnected") => void,
   ): () => void;
 }
 export const eventPath = "/api/v1/farms/:farmId/events";
