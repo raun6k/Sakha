@@ -1,6 +1,8 @@
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import sse from "@fastify/sse";
 import { roleDirectory } from "@sakha/agents-farming";
 import * as c from "@sakha/contracts";
+import type { Runtime } from "@sakha/core";
 import { authorize, createCoreServices } from "@sakha/core";
 import { createDataServices } from "@sakha/data";
 import {
@@ -10,12 +12,17 @@ import {
 } from "@sakha/farm";
 import Fastify from "fastify";
 import { z } from "zod";
+import { replayEvents } from "./events.js";
+import { createExecution } from "./execution.js";
+import { createLifecycle } from "./lifecycle.js";
 import { Storage } from "./storage/database.js";
 export function createApp(options: {
   databasePath: string;
   logger?: boolean;
   origin?: string;
   devOrigins?: string[];
+  runtime?: Runtime;
+  startScheduler?: boolean;
 }) {
   const store = new Storage(options.databasePath);
   const farm = createFarmServices(store, randomUUID, () =>
@@ -40,6 +47,7 @@ export function createApp(options: {
     farm.assertFarm,
     () => new Date().toISOString(),
   );
+  const lifecycle = createLifecycle(store, farm);
   const sessionToken = randomBytes(32).toString("hex");
   const origin = options.origin ?? "http://127.0.0.1:4310";
   const allowedOrigins = new Set([origin, ...(options.devOrigins ?? [])]);
@@ -48,6 +56,7 @@ export function createApp(options: {
     bodyLimit: 14_000_000,
   });
   app.addHook("onRequest", async (request) => {
+    if (!request.url.startsWith("/api/")) return;
     if (request.url === "/api/v1/health") return;
     const host = request.headers.host;
     const actualOrigin = request.headers.origin;
@@ -132,6 +141,40 @@ export function createApp(options: {
         const input = operation.input.parse(
           operation.method === "GET" ? request.query : (request.body ?? {}),
         );
+        const runtimeReady =
+          ["listAgents", "getAgent", "getHome", "bootstrap"].includes(name) &&
+          options.runtime
+            ? (await options.runtime.getCapabilities()).ready
+            : false;
+        const roleProjection = (farmId?: string) =>
+          roleDirectory(runtimeReady).map((role) => {
+            const consent = farmId
+              ? store
+                  .list("consent", farmId)
+                  .map((x) => c.Consent.parse(x))
+                  .some(
+                    (x) =>
+                      x.status === "active" &&
+                      x.external_processing &&
+                      x.roles.includes(role.key) &&
+                      x.fields.includes("conversation"),
+                  )
+              : false;
+            return {
+              ...role,
+              capabilities: role.capabilities.map((cap) =>
+                cap.key === "chat" && runtimeReady && !consent
+                  ? {
+                      ...cap,
+                      status: "needs_information" as const,
+                      reason:
+                        "Grant external processing of conversation text to this specialist",
+                      requirements: ["scoped external-processing consent"],
+                    }
+                  : cap,
+              ),
+            };
+          });
         const perform = () => {
           if (name === "health") return { status: "ok" };
           if (name === "bootstrap")
@@ -141,7 +184,7 @@ export function createApp(options: {
               readiness: (
                 store.db
                   .prepare(
-                    "SELECT count(*) as count FROM records WHERE kind='farm'",
+                    "SELECT count(*) as count FROM records WHERE kind='farm' AND json_extract(payload,'$.setup_complete')=1",
                   )
                   .get() as { count: number }
               ).count
@@ -157,10 +200,56 @@ export function createApp(options: {
               supported_languages: ["en"],
               supported_units: ["ha", "acre", "mm", "m3", "kg", "INR"],
             });
-          if (name === "listAgents") return roleDirectory();
+          if (name === "listAgents") return roleProjection(params.farmId);
           if (name === "getAgent") {
             farm.assertFarm(params.farmId ?? "");
-            return roleDirectory().find((role) => role.key === params.roleKey);
+            return roleProjection(params.farmId).find(
+              (role) => role.key === params.roleKey,
+            );
+          }
+          if (name === "getHome") {
+            const farmId = params.farmId ?? "";
+            const profile = farm.assertFarm(farmId);
+            const findings = store
+              .list("finding", farmId)
+              .map((x) => c.Finding.parse(x))
+              .map((x) => ({
+                ...x,
+                freshness:
+                  x.freshness.valid_until &&
+                  Date.parse(x.freshness.valid_until) < Date.now()
+                    ? { ...x.freshness, status: "stale" as const }
+                    : x.freshness,
+              }));
+            const briefing = findings
+              .filter((x) => x.role_key === "chief_of_staff")
+              .at(-1);
+            return c.Home.parse({
+              farm: profile,
+              sections: {
+                briefing: {
+                  summary:
+                    briefing?.summary ??
+                    "Your saved farm context and evidence are ready to review. Ask Sakha to build a proposal; unknown measurements and unavailable sources remain explicit.",
+                  freshness: briefing?.freshness ?? {
+                    status: "unknown",
+                    reason: "No saved Chief of Staff briefing yet",
+                  },
+                },
+                context: farm.listFacts(farmId),
+                climate: findings.filter((x) => x.role_key === "climate"),
+                weather: findings.filter((x) => x.role_key === "weather"),
+                actions: store
+                  .list("task", farmId)
+                  .map((x) => c.Task.parse(x))
+                  .filter((x) => x.status === "pending"),
+                agents: roleProjection(farmId),
+                plan: domain.plan(farmId),
+              },
+              alerts: store.list("alert", farmId).map((x) => c.Alert.parse(x)),
+              insights: dataServices.insights(farmId),
+              capabilities: dataServices.sources().map((x) => x.capability),
+            });
           }
           const scope = params.farmId ?? "installation";
           authorize(
@@ -175,6 +264,18 @@ export function createApp(options: {
             )
           )
             return dataServices.execute(name as c.OperationName, input, params);
+          if (
+            [
+              "requestExport",
+              "getExport",
+              "requestDeletion",
+              "getDeletion",
+              "uploadAttachment",
+              "getAttachment",
+              "deleteAttachment",
+            ].includes(name)
+          )
+            return lifecycle.execute(name as c.OperationName, input, params);
           const coreNames = [
             "Conversation",
             "Messages",
@@ -222,6 +323,66 @@ export function createApp(options: {
         };
       },
     });
-  app.addHook("onClose", async () => store.close());
-  return { app, store, farm, core, dataServices, sessionToken };
+  const services = { store, farm, core, domain, dataServices, lifecycle };
+  const execution = createExecution(services, options.runtime);
+  if (options.startScheduler) execution.start();
+  app.get(
+    "/api/v1/farms/:farmId/exports/:jobId/download",
+    async (request, reply) => {
+      const { farmId, jobId } = z
+        .object({ farmId: c.Id, jobId: c.Id })
+        .parse(request.params);
+      return reply
+        .type("application/json")
+        .header(
+          "content-disposition",
+          `attachment; filename="sakha-export-${jobId}.json"`,
+        )
+        .send(lifecycle.download(farmId, jobId));
+    },
+  );
+  app.register(sse, { heartbeatInterval: 15000 });
+  app.register(async (server) => {
+    server.get(
+      "/api/v1/farms/:farmId/events",
+      { sse: "only" },
+      async (request, reply) => {
+        const { farmId } = z.object({ farmId: c.Id }).parse(request.params);
+        farm.assertFarm(farmId);
+        let cursor: string | undefined = z
+          .object({ cursor: c.Id.optional() })
+          .parse(request.query).cursor;
+        const headerCursor = request.headers["last-event-id"];
+        if (!cursor && typeof headerCursor === "string") cursor = headerCursor;
+        if (Array.isArray(cursor))
+          throw new DomainError("validation", "Invalid cursor");
+        const stream = reply.sse;
+        if (!stream) throw new DomainError("internal", "Stream unavailable");
+        const send = async () => {
+          for (const event of replayEvents(store, farmId, cursor)) {
+            await stream.send({ id: event.cursor, data: event });
+            cursor = event.cursor;
+          }
+        };
+        await send();
+        stream.keepAlive();
+        let pending = false;
+        const interval = setInterval(() => {
+          if (pending) return;
+          pending = true;
+          void send()
+            .catch(() => stream.close())
+            .finally(() => {
+              pending = false;
+            });
+        }, 250);
+        stream.onClose(() => clearInterval(interval));
+      },
+    );
+  });
+  app.addHook("onClose", async () => {
+    await execution.stop();
+    store.close();
+  });
+  return { app, ...services, execution, sessionToken };
 }

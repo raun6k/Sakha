@@ -1,0 +1,1 @@
+CREATE TABLE private_artifacts(id TEXT NOT NULL,farm_id TEXT NOT NULL REFERENCES scopes(id) ON DELETE CASCADE,kind TEXT NOT NULL CHECK(kind IN ('attachment','export')),bytes BLOB NOT NULL,PRIMARY KEY(id,farm_id));

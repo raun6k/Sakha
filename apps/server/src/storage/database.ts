@@ -187,6 +187,59 @@ export class Storage implements Store {
       .run(id, farmId, kind, JSON.stringify(payload));
     return id;
   }
+  farms(): string[] {
+    return (
+      this.db.prepare("SELECT id FROM scopes WHERE kind='farm'").all() as {
+        id: string;
+      }[]
+    ).map((x) => x.id);
+  }
+  claimJob(now: string, leaseSeconds = 180) {
+    return this.transaction(() => {
+      const row = this.db
+        .prepare(
+          "SELECT * FROM outbox WHERE status='queued' AND available_at<=? ORDER BY rowid LIMIT 1",
+        )
+        .get(now) as
+        | {
+            id: string;
+            farm_id: string;
+            kind: string;
+            payload: string;
+            attempts: number;
+          }
+        | undefined;
+      if (!row) return undefined;
+      this.db
+        .prepare(
+          "UPDATE outbox SET status='running',attempts=attempts+1,lease_until=? WHERE id=? AND status='queued'",
+        )
+        .run(
+          new Date(Date.parse(now) + leaseSeconds * 1000).toISOString(),
+          row.id,
+        );
+      return { ...row, payload: JSON.parse(row.payload) as unknown };
+    });
+  }
+  finishJob(id: string, outcome: unknown, failed = false) {
+    this.db
+      .prepare(
+        "UPDATE outbox SET status=?,lease_until=NULL,outcome=? WHERE id=?",
+      )
+      .run(failed ? "failed" : "completed", JSON.stringify(outcome), id);
+  }
+  recoverJobs() {
+    this.db
+      .prepare(
+        "UPDATE outbox SET status='interrupted',lease_until=NULL,outcome=? WHERE status='running'",
+      )
+      .run(
+        JSON.stringify({
+          reason:
+            "Backend stopped; uncertain work is not retried automatically",
+        }),
+      );
+  }
   close(): void {
     this.db.close();
   }
