@@ -2,6 +2,7 @@ import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { roleDirectory } from "@sakha/agents-farming";
 import * as c from "@sakha/contracts";
 import { authorize, createCoreServices } from "@sakha/core";
+import { createDataServices } from "@sakha/data";
 import {
   createDomainServices,
   createFarmServices,
@@ -31,6 +32,12 @@ export function createApp(options: {
     farm.makeBase,
     farm.assertFarm,
     farm.listFacts,
+    () => new Date().toISOString(),
+  );
+  const dataServices = createDataServices(
+    store,
+    farm.makeBase,
+    farm.assertFarm,
     () => new Date().toISOString(),
   );
   const sessionToken = randomBytes(32).toString("hex");
@@ -162,6 +169,12 @@ export function createApp(options: {
             { id: Object.values(params).join(":") || scope, farmId: scope },
             true,
           );
+          if (
+            ["listSources", "getSource", "getEvidence", "getInsights"].includes(
+              name,
+            )
+          )
+            return dataServices.execute(name as c.OperationName, input, params);
           const coreNames = [
             "Conversation",
             "Messages",
@@ -210,5 +223,5 @@ export function createApp(options: {
       },
     });
   app.addHook("onClose", async () => store.close());
-  return { app, store, farm, core, sessionToken };
+  return { app, store, farm, core, dataServices, sessionToken };
 }

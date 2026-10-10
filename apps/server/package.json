@@ -26,6 +26,7 @@
     "zod": "4.6.5",
     "@sakha/farm": "workspace:*",
     "@sakha/core": "workspace:*",
-    "@sakha/agents-farming": "workspace:*"
+    "@sakha/agents-farming": "workspace:*",
+    "@sakha/data": "workspace:*"
   }
 }

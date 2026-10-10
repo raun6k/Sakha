@@ -319,6 +319,26 @@ export function createDomainServices(
           }
           case "listTasks":
             return { items: store.list("task", farmId), next_cursor: null };
+          case "getActivity":
+            return load(
+              store,
+              "activity",
+              params.activityId ?? "",
+              farmId,
+              c.Activity,
+            );
+          case "getOutcome": {
+            const record = load(
+              store,
+              "history",
+              params.outcomeId ?? "",
+              farmId,
+              c.HistoryEntry,
+            );
+            if (record.kind !== "outcome")
+              throw new DomainError("not_found", "Outcome not found");
+            return record;
+          }
           case "recordActivity":
           case "correctActivity": {
             const d =

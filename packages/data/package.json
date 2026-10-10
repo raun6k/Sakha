@@ -1,0 +1,13 @@
+{
+  "name": "@sakha/data",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@sakha/contracts": "workspace:*",
+    "@sakha/farm": "workspace:*",
+    "geotiff": "3.0.5",
+    "zod": "4.6.5"
+  }
+}
