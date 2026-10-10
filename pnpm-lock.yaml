@@ -220,9 +220,15 @@ importers:
       '@opentelemetry/api':
         specifier: 1.9.1
         version: 1.9.1
+      '@sakha/agents-farming':
+        specifier: workspace:*
+        version: link:../../packages/agents-farming
       '@sakha/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@sakha/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@sakha/farm':
         specifier: workspace:*
         version: link:../../packages/farm
@@ -309,8 +315,29 @@ importers:
         specifier: 8.3.4
         version: 8.3.4(@types/node@24.10.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
 
+  packages/agents-farming:
+    dependencies:
+      '@sakha/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+
   packages/contracts:
     dependencies:
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
+
+  packages/core:
+    dependencies:
+      '@cedar-policy/cedar-wasm':
+        specifier: 4.13.0
+        version: 4.13.0
+      '@sakha/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@sakha/farm':
+        specifier: workspace:*
+        version: link:../farm
       zod:
         specifier: 4.6.5
         version: 4.6.5
