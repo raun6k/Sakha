@@ -27,6 +27,7 @@
     "@sakha/farm": "workspace:*",
     "@sakha/core": "workspace:*",
     "@sakha/agents-farming": "workspace:*",
-    "@sakha/data": "workspace:*"
+    "@sakha/data": "workspace:*",
+    "@sakha/runtime-strands": "workspace:*"
   }
 }
