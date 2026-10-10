@@ -334,7 +334,7 @@ export function ChartCard({
         ) : (
           <Link
             className="text-link"
-            to={`/agents/${series.source_id === "C01" ? "climate" : "weather"}?tab=chat&evidence=${encodeURIComponent(series.evidence_id ?? "")}&source=${series.source_id}&range=${series.source_id === "C01" ? "5years" : "30days"}`}
+            to={`/agents/${series.source_id === "C01" ? "climate" : "weather"}?tab=chat&evidence=${encodeURIComponent(series.evidence_id ?? "")}&source=${series.source_id}&snapshot=${encodeURIComponent(series.snapshot_id)}&range=${series.source_id === "C01" ? "5years" : "30days"}`}
           >
             Ask the specialist
           </Link>
@@ -361,6 +361,10 @@ export function AlertDetails({
     farmId: alert.farm_id,
     alertId: alert.id,
   });
+  const dismiss = useCommand("dismissAlert", {
+    farmId: alert.farm_id,
+    alertId: alert.id,
+  });
   return (
     <Modal
       open
@@ -382,7 +386,7 @@ export function AlertDetails({
         Evidence freshness: {alert.freshness.status}
       </p>
       <EvidenceLinks evidence={alert.evidence} />
-      <ErrorNotice error={command.error} />
+      <ErrorNotice error={command.error ?? dismiss.error} />
       <div className="actions">
         {alert.status === "active" ? (
           <button
@@ -393,9 +397,25 @@ export function AlertDetails({
               void command
                 .mutateAsync({ expected_version: alert.version })
                 .then(onClose)
+                .catch(() => {})
             }
           >
             Acknowledge alert
+          </button>
+        ) : null}
+        {alert.status !== "dismissed" ? (
+          <button
+            type="button"
+            className="button secondary"
+            disabled={dismiss.isPending}
+            onClick={() =>
+              void dismiss
+                .mutateAsync({ expected_version: alert.version })
+                .then(onClose)
+                .catch(() => {})
+            }
+          >
+            Dismiss alert
           </button>
         ) : null}
         <Link

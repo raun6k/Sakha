@@ -7,13 +7,16 @@ import {
   Home,
   Leaf,
   MapPin,
+  Menu,
   MessageCircle,
   Settings,
   Sprout,
   Users,
 } from "lucide-react";
+import { useState } from "react";
 import { Link, NavLink, Outlet } from "react-router";
 import { bootstrapFarm, useRead, useService } from "../services/context";
+import { Modal } from "./ui";
 
 const primary = [
   { to: "/", label: "Home", Icon: Home },
@@ -43,6 +46,7 @@ function NavItems({ items }: { items: typeof primary }) {
 }
 export function Shell() {
   const { demo } = useService();
+  const [more, setMore] = useState(false);
   const bootstrap = useRead("bootstrap", { input: {} });
   const farm = bootstrap.data ? bootstrapFarm(bootstrap.data) : undefined;
   return (
@@ -80,6 +84,14 @@ export function Shell() {
             {farm?.location?.district ?? "Location not recorded"}
             {farm?.location?.state ? `, ${farm.location.state}` : ""}
           </span>
+          <button
+            type="button"
+            className="icon-button mobile-more"
+            aria-label="Open supporting pages"
+            onClick={() => setMore(true)}
+          >
+            <Menu size={21} />
+          </button>
           <Link to="/alerts" aria-label="Open alerts">
             <Bell size={20} />
           </Link>
@@ -92,6 +104,18 @@ export function Shell() {
               Open real local profile
             </Link>
           </div>
+        ) : null}
+        {more ? (
+          <Modal open onClose={() => setMore(false)} title="More in Sakha">
+            <nav className="more-nav" aria-label="Supporting destinations">
+              {secondary.map(({ to, label, Icon }) => (
+                <Link key={to} to={to} onClick={() => setMore(false)}>
+                  <Icon size={20} />
+                  {label}
+                </Link>
+              ))}
+            </nav>
+          </Modal>
         ) : null}
         <main id="main" tabIndex={-1}>
           <Outlet />

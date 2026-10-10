@@ -7,14 +7,16 @@ import type {
   ServiceRequest,
 } from "@sakha/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createContext, useContext } from "react";
+import { createContext, useContext, useRef } from "react";
 import { commandKey } from "./http";
 export const ServiceContext = createContext<{
   service: SakhaService;
   demo: boolean;
-}>({ service: null as unknown as SakhaService, demo: false });
+} | null>(null);
 export function useService() {
-  return useContext(ServiceContext);
+  const context = useContext(ServiceContext);
+  if (!context) throw new Error("Sakha service provider is missing.");
+  return context;
 }
 export function useRead<K extends OperationName>(
   name: K,
@@ -43,13 +45,21 @@ export function useCommand<K extends OperationName>(
 ) {
   const { service } = useService();
   const client = useQueryClient();
+  const identities = useRef(new Map<string, string>());
   return useMutation({
-    mutationFn: (input: OperationInput<K>) =>
-      service.execute(name, {
+    mutationFn: (input: OperationInput<K>) => {
+      const hash = JSON.stringify({ name, params, input });
+      let key = identities.current.get(hash);
+      if (!key) {
+        key = commandKey();
+        identities.current.set(hash, key);
+      }
+      return service.execute(name, {
         input,
         params,
-        command: { idempotency_key: commandKey() },
-      } as ServiceRequest<K>),
+        command: { idempotency_key: key },
+      } as ServiceRequest<K>);
+    },
     onSuccess: () => client.invalidateQueries({ queryKey: ["sakha"] }),
   });
 }
@@ -57,7 +67,7 @@ export async function executeCommand<K extends OperationName>(
   service: SakhaService,
   name: K,
   request: Omit<ServiceRequest<K>, "command">,
-  key = commandKey(),
+  key: string = commandKey(),
 ): Promise<OperationOutput<K>> {
   return service.execute(name, {
     ...request,

@@ -39,7 +39,7 @@ export function reconcileEvent(state: StreamState, event: Event): StreamState {
     next.messages = [
       ...state.messages.filter((m) => m.id !== message.id),
       message,
-    ];
+    ].slice(-200);
     delete next.partial[id];
   }
   if (event.type === "run_progress" && event.payload.text)
@@ -54,7 +54,10 @@ export function reconcileEvent(state: StreamState, event: Event): StreamState {
     ["failed", "cancelled", "interrupted", "completed"].includes(
       event.payload.state ?? "",
     )
-  )
+  ) {
     delete next.partial[id];
+    delete next.progress[id];
+    delete next.sequences[id];
+  }
   return next;
 }

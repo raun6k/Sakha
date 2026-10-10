@@ -4,8 +4,11 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router";
 import { Shell } from "./components/shell";
 import { State } from "./components/ui";
+import { AgentsPage, AskPage, WorkspacePage } from "./pages/agents";
+import { ActivityPage, AlertsPage, PlanPage } from "./pages/decisions";
 import { FarmPage, Setup, Startup } from "./pages/farm";
 import { HomePage } from "./pages/home";
+import { HelpPage, InsightsPage, SettingsPage } from "./pages/support";
 import { ServiceContext } from "./services/context";
 import { createFixtureService } from "./services/fixture";
 import { createHttpService } from "./services/http";
@@ -36,11 +39,20 @@ if (root)
                 <Route element={<Shell />}>
                   <Route path="/" element={<HomePage />} />
                   <Route path="/farm" element={<FarmPage />} />
+                  <Route path="/ask" element={<AskPage />} />
+                  <Route path="/agents" element={<AgentsPage />} />
+                  <Route path="/agents/:roleKey" element={<WorkspacePage />} />
+                  <Route path="/plan" element={<PlanPage />} />
+                  <Route path="/alerts" element={<AlertsPage />} />
+                  <Route path="/activity" element={<ActivityPage />} />
+                  <Route path="/insights" element={<InsightsPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/help" element={<HelpPage />} />
                   <Route
                     path="*"
                     element={
-                      <State title="This part is being connected">
-                        Frontend development is in progress.
+                      <State title="Page not found">
+                        Choose one of the primary destinations to continue.
                       </State>
                     }
                   />

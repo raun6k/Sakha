@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { Dialog } from "radix-ui";
-import type { ReactNode } from "react";
+import { type ReactNode, useRef } from "react";
 import { Link } from "react-router";
 import { errorMessage } from "../services/http";
 export const roleIcons: Record<RoleKey, typeof Leaf> = {
@@ -147,6 +147,7 @@ export function Modal({
   children: ReactNode;
   description?: string;
 }) {
+  const returnFocus = useRef<HTMLElement | null>(null);
   return (
     <Dialog.Root
       open={open}
@@ -156,7 +157,19 @@ export function Modal({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content className="dialog-content">
+        <Dialog.Content
+          className="dialog-content"
+          onOpenAutoFocus={() => {
+            returnFocus.current =
+              document.activeElement instanceof HTMLElement
+                ? document.activeElement
+                : null;
+          }}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            returnFocus.current?.focus();
+          }}
+        >
           <div className="section-head">
             <Dialog.Title>{title}</Dialog.Title>
             <Dialog.Close className="icon-button" aria-label="Close">
@@ -276,15 +289,27 @@ export function SourceCard({
     </div>
   );
 }
-export function DateText({ value }: { value?: string }) {
+export function DateText({
+  value,
+  precision = "exact",
+}: {
+  value?: string;
+  precision?: string;
+}) {
+  const display = value
+    ? new Date(value).toLocaleString(
+        "en-IN",
+        precision === "exact"
+          ? { dateStyle: "medium", timeStyle: "short" }
+          : precision === "month"
+            ? { month: "long", year: "numeric" }
+            : { dateStyle: "medium" },
+      )
+    : "Time not recorded";
   return (
     <time dateTime={value}>
-      {value
-        ? new Date(value).toLocaleString("en-IN", {
-            dateStyle: "medium",
-            timeStyle: "short",
-          })
-        : "Time not recorded"}
+      {precision === "approximate" ? "Around " : ""}
+      {display}
     </time>
   );
 }

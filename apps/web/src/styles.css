@@ -172,7 +172,7 @@ th {
   flex-direction: column;
   gap: 5px;
 }
-.sidebar nav a {
+.sidebar :where(nav) a {
   display: flex;
   align-items: center;
   gap: 13px;
@@ -182,15 +182,15 @@ th {
   font-size: 0.98rem;
   text-decoration: none;
 }
-.sidebar nav a:hover {
+.sidebar :where(nav) a:where(:hover) {
   background: #1c503e;
 }
-.sidebar nav a.active {
+.sidebar :where(nav) a:where(.active) {
   background: #246447;
   box-shadow: inset 0 0 0 1px #81a25060;
   color: #fff;
 }
-.sidebar nav a.active svg {
+.sidebar :where(nav a.active) svg {
   color: #e0cb76;
 }
 .sidebar-divider {
@@ -198,7 +198,7 @@ th {
   background: #49705b;
   margin: 22px 10px;
 }
-.sidebar .secondary-nav a {
+.sidebar :where(.secondary-nav) a {
   font-size: 0.88rem;
   padding: 10px 14px;
 }
@@ -830,7 +830,7 @@ main {
   color: #e5ecdf;
   background: #143226;
 }
-.splash .state-panel p {
+.splash :where(.state-panel) p {
   color: #d2dfcf;
 }
 .checkbox-row {
@@ -1106,5 +1106,35 @@ main {
   }
   .mobile-nav a {
     padding-inline: 7px;
+  }
+}
+
+.mobile-more {
+  display: none;
+}
+.more-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.more-nav a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #eef3e9;
+  color: var(--evergreen);
+  min-height: 46px;
+}
+@media (max-width: 700px) {
+  .mobile-more {
+    display: inline-flex;
+  }
+  .utility-bar span {
+    margin-right: auto;
+  }
+  .utility-bar {
+    gap: 14px;
   }
 }

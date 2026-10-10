@@ -183,3 +183,146 @@ describe("transport and streaming", () => {
     ).toEqual({});
   });
 });
+describe("backend restart and transport recovery", () => {
+  it("renews only an expired session on reads and repeats the same read", async () => {
+    const bootstrap = await createFixtureService().execute("bootstrap", {
+      input: {},
+    });
+    const expired = {
+      code: "permission_denied",
+      message: "Old process session",
+      retryable: false,
+      request_id: "s",
+      details: { session_expired: true },
+    };
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(expired), { status: 403 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            schema_version: CONTRACT_VERSION,
+            request_id: "b",
+            data: { ...bootstrap, session_token: "renewed" },
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            schema_version: CONTRACT_VERSION,
+            request_id: "f",
+            data: bootstrap.farms[0],
+          }),
+        ),
+      );
+    const service = createHttpService(fetcher);
+    await service.execute("getFarm", {
+      params: { farmId: "fixture-farm" },
+      input: {},
+    });
+    expect(fetcher.mock.calls.map((args) => args[0])).toEqual([
+      "/api/v1/farms/fixture-farm",
+      "/api/v1/bootstrap",
+      "/api/v1/farms/fixture-farm",
+    ]);
+    expect(fetcher.mock.calls[2]?.[1]?.headers).toMatchObject({
+      "X-Sakha-Session": "renewed",
+    });
+  });
+  it("renews expired protection but never automatically resubmits a mutation", async () => {
+    const bootstrap = await createFixtureService().execute("bootstrap", {
+      input: {},
+    });
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            code: "permission_denied",
+            message: "Old session",
+            retryable: false,
+            request_id: "r",
+            details: { session_expired: true },
+          }),
+          { status: 403 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            schema_version: CONTRACT_VERSION,
+            request_id: "b",
+            data: bootstrap,
+          }),
+        ),
+      );
+    const service = createHttpService(fetcher);
+    await expect(
+      service.execute("updateFarm", {
+        params: { farmId: "fixture-farm" },
+        input: { name: "Change", expected_version: 1 },
+        command,
+      }),
+    ).rejects.toThrow("not been resubmitted");
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher.mock.calls[0]?.[1]?.headers).toMatchObject({
+      "Idempotency-Key": "command-1",
+    });
+  });
+  it("does not reinterpret ordinary permission denial as stale session protection", async () => {
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          code: "permission_denied",
+          message: "Not allowed",
+          retryable: false,
+          request_id: "r",
+        }),
+        { status: 403 },
+      ),
+    );
+    await expect(
+      createHttpService(fetcher).execute("getFarm", {
+        params: { farmId: "f" },
+        input: {},
+      }),
+    ).rejects.toThrow("Not allowed");
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+  it("parses split CRLF frames including comments without dropping the event", async () => {
+    const event: Event = {
+      schema_version: CONTRACT_VERSION,
+      cursor: "c",
+      farm_id: "f",
+      type: "farm_changed",
+      timestamp: "2026-10-10T00:00:00Z",
+      correlation_id: "r",
+      payload: {},
+    };
+    const encoder = new TextEncoder();
+    const source = `: heartbeat\r\n\r\ndata: ${JSON.stringify(event)}\r\n\r\n`;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const char of source) controller.enqueue(encoder.encode(char));
+        controller.close();
+      },
+    });
+    const onEvent = vi.fn();
+    const onStatus = vi.fn();
+    const fetcher = vi.fn().mockResolvedValue(new Response(stream));
+    const stop = createHttpService(fetcher).subscribe(
+      "f",
+      undefined,
+      onEvent,
+      vi.fn(),
+      onStatus,
+    );
+    await vi.waitFor(() => expect(onEvent).toHaveBeenCalledOnce());
+    stop();
+    expect(onEvent.mock.calls[0]?.[0]).toMatchObject({ cursor: "c" });
+    expect(onStatus).toHaveBeenCalledWith("connected");
+  });
+});

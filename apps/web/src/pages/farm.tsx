@@ -1,7 +1,7 @@
 import type { Fact, Farm, OperationInput } from "@sakha/contracts";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Leaf } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import {
   Banner,
@@ -121,12 +121,17 @@ export function Setup() {
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
   const client = useQueryClient();
+  const savedSetupFarm = useRef<Farm | undefined>(undefined);
+  const setupCommand = useRef(crypto.randomUUID());
+  const profileCommand = useRef(crypto.randomUUID());
   const finish = async () => {
     if (busy) return;
     setBusy(true);
     setError(undefined);
     try {
-      let farm = bootstrap.data ? bootstrapFarm(bootstrap.data) : undefined;
+      let farm =
+        savedSetupFarm.current ??
+        (bootstrap.data ? bootstrapFarm(bootstrap.data) : undefined);
       const location =
         draft.state || draft.district || draft.village
           ? {
@@ -138,21 +143,37 @@ export function Setup() {
           : undefined;
       const name = draft.name.trim() || "My farm";
       if (!farm)
-        farm = await executeCommand(service, "createFarm", {
-          input: { name, location },
-        });
-      else
-        farm = await executeCommand(service, "updateFarm", {
+        farm = await executeCommand(
+          service,
+          "createFarm",
+          {
+            input: { name, location },
+          },
+          profileCommand.current,
+        );
+      else if (!savedSetupFarm.current)
+        farm = await executeCommand(
+          service,
+          "updateFarm",
+          {
+            params: { farmId: farm.id },
+            input: { name, location, expected_version: farm.version },
+          },
+          profileCommand.current,
+        );
+      savedSetupFarm.current = farm;
+      await executeCommand(
+        service,
+        "completeSetup",
+        {
           params: { farmId: farm.id },
-          input: { name, location, expected_version: farm.version },
-        });
-      await executeCommand(service, "completeSetup", {
-        params: { farmId: farm.id },
-        input: {
-          expected_version: farm.version,
-          facts: setupFacts(draft, farm.id),
+          input: {
+            expected_version: farm.version,
+            facts: setupFacts(draft, farm.id),
+          },
         },
-      });
+        setupCommand.current,
+      );
       await client.invalidateQueries({ queryKey: ["sakha"] });
       clear();
       navigate("/");
@@ -754,7 +775,10 @@ export function FarmPage() {
                     <p>{quantityText(f.value)}</p>
                     <small>
                       {f.provenance.attribution} ·{" "}
-                      <DateText value={f.provenance.effective_at} />
+                      <DateText
+                        value={f.provenance.effective_at}
+                        precision={f.provenance.effective_time_precision}
+                      />
                     </small>
                   </div>
                   {f.corrects_id ? (

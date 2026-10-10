@@ -206,6 +206,7 @@ export function createFixtureService(
   const runs: c.Run[] = [];
   let consents: c.Consent[] = [];
   let history: c.HistoryEntry[] = [];
+  const activities: c.Activity[] = [];
   const jobs: c.Job[] = [];
   const scenarios: c.Scenario[] = [];
   let tasks: c.Task[] = [
@@ -559,6 +560,14 @@ export function createFixtureService(
         }, 150);
         return run;
       }
+      case "listRuns":
+        return resultPage(
+          runs.filter(
+            (r) =>
+              !input.conversation_id ||
+              r.conversation_id === input.conversation_id,
+          ),
+        );
       case "getRun":
         return find(runs, params.runId);
       case "cancelRun": {
@@ -698,9 +707,19 @@ export function createFixtureService(
         task.version++;
         return task;
       }
+      case "getActivity":
+        return find(activities, params.activityId);
+      case "getOutcome":
+        return find(history, params.outcomeId);
       case "recordActivity":
       case "correctActivity": {
-        const activity = c.Activity.parse({ ...base(), ...input });
+        const activity = c.Activity.parse({
+          ...base(),
+          ...input,
+          corrects_id:
+            name === "correctActivity" ? params.activityId : undefined,
+        });
+        activities.push(activity);
         if (activity.task_id) {
           const task = find(tasks, activity.task_id);
           task.status = "completed";
@@ -736,13 +755,15 @@ export function createFixtureService(
         );
       case "recordOutcome":
       case "correctOutcome": {
+        if (name === "correctOutcome") version(find(history, params.outcomeId));
         const outcome = c.HistoryEntry.parse({
           ...base(),
           kind: name === "recordOutcome" ? "outcome" : "correction",
           title: input.description,
           summary: "Synthetic farmer report",
-          record_id: input.activity_id ?? input.finding_id ?? makeId(),
+          record_id: "pending",
         });
+        outcome.record_id = outcome.id;
         history.push(outcome);
         return outcome;
       }
@@ -851,7 +872,8 @@ export function createFixtureService(
         commandResults.set(key, { hash, result: structuredClone(result) });
       return structuredClone(result) as c.OperationOutput<K>;
     },
-    subscribe(_farm, cursor, onEvent) {
+    subscribe(_farm, cursor, onEvent, _onError, onConnection) {
+      onConnection?.("connected");
       if (cursor) {
         const index = replay.findIndex((e) => e.cursor === cursor);
         for (const event of replay.slice(index + 1)) onEvent(event);
