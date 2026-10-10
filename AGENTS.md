@@ -9,6 +9,7 @@ Sakha is an open-source farming Command Center running in a local browser with o
 The repository currently contains planning documents and visual references, not an implemented application. Consult [the documentation map](docs/README.md) and only the owner documents relevant to the task:
 
 - [Architecture](docs/architecture.md): shared state, agent collaboration, evidence, permissions and plan lifecycle.
+- [Build plan](docs/build-plan.md): shared foundation, parallel backend/frontend phases, contract ownership, handoff gates and one final integration/validation phase.
 - [Technology baseline](docs/tech-stack-proposal.md): named packages, recorded version candidates and runtime boundaries.
 - [Agent directory](docs/agent-directory.md) and [source catalog](docs/data-sources.md): role authority and data meanings.
 - [Frontend architecture](docs/frontend-architecture.md), [page inventory](docs/frontend/01-page-inventory-and-sitemap.md), [feature specifications](docs/frontend/02-page-feature-specifications.md) and [journeys](docs/frontend/03-user-journey-maps.md): UI scope and behavior.
