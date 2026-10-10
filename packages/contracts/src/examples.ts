@@ -328,6 +328,8 @@ export const responseExamples: Record<c.OperationName, unknown> = {
   getPlanRevision: revision,
   decidePlan: { ...revision, status: "changes_requested" },
   listTasks: paged(task),
+  getActivity: activity,
+  getOutcome: { ...history, kind: "outcome" },
   recordActivity: activity,
   correctActivity: { ...activity, corrects_id: "original" },
   deferTask: { ...task, status: "deferred" },
