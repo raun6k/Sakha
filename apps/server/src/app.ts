@@ -45,7 +45,8 @@ export function createApp(options: {
     const host = request.headers.host;
     const actualOrigin = request.headers.origin;
     if (
-      host !== new URL(origin).host ||
+      !host ||
+      new URL(`http://${host}`).host !== new URL(origin).host ||
       request.headers["sec-fetch-site"] === "cross-site" ||
       (actualOrigin && !allowedOrigins.has(actualOrigin))
     )
@@ -63,6 +64,8 @@ export function createApp(options: {
       throw new DomainError(
         "permission_denied",
         "Local session expired. Reload Sakha",
+        false,
+        { session_expired: true },
       );
     if (
       !["GET", "HEAD"].includes(request.method) &&
@@ -109,6 +112,7 @@ export function createApp(options: {
         message,
         retryable: code === "unavailable",
         request_id: request.id,
+        details: error instanceof DomainError ? error.details : undefined,
       }),
     );
   });

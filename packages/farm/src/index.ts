@@ -20,6 +20,7 @@ export class DomainError extends Error {
     public code: c.ApiError["code"],
     message: string,
     public retryable = false,
+    public details?: Record<string, string | number | boolean>,
   ) {
     super(message);
   }
