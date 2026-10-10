@@ -2,7 +2,7 @@ import { CONTRACT_VERSION, type Event } from "@sakha/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { emptyStream, reconcileEvent } from "../state/stream";
 import { createFixtureService } from "./fixture";
-import { createHttpService, operationUrl } from "./http";
+import { createHttpService, downloadExport, operationUrl } from "./http";
 
 const command = { idempotency_key: "command-1" };
 describe("command lifecycle in synthetic adapter", () => {
@@ -324,5 +324,98 @@ describe("backend restart and transport recovery", () => {
     stop();
     expect(onEvent.mock.calls[0]?.[0]).toMatchObject({ cursor: "c" });
     expect(onStatus).toHaveBeenCalledWith("connected");
+  });
+});
+describe("historical context and bounded stream state", () => {
+  it("bounds canonical messages across long-lived event subscriptions", () => {
+    let state = emptyStream();
+    for (let i = 0; i < 260; i++) {
+      const event: Event = {
+        cursor: `m${i}`,
+        farm_id: "f",
+        type: "message_final",
+        schema_version: CONTRACT_VERSION,
+        timestamp: "2026-10-10T00:00:00Z",
+        correlation_id: `r${i}`,
+        run_id: `r${i}`,
+        payload: {
+          message: {
+            id: `m${i}`,
+            farm_id: "f",
+            version: 1,
+            created_at: "2026-10-10T00:00:00Z",
+            updated_at: "2026-10-10T00:00:00Z",
+            conversation_id: "c",
+            role_key: "chief_of_staff",
+            author: "agent",
+            status: "final",
+            text: "saved",
+            context: { fact_versions: {}, evidence: [] },
+          },
+        },
+      };
+      state = reconcileEvent(state, event);
+    }
+    expect(state.messages).toHaveLength(200);
+    expect(state.messages[0]?.id).toBe("m60");
+  });
+  it("a hypothetical scenario never changes authoritative farm facts", async () => {
+    const s = createFixtureService();
+    const before = await s.execute("listFacts", {
+      params: { farmId: "fixture-farm" },
+      input: {},
+    });
+    await s.execute("createScenario", {
+      params: { farmId: "fixture-farm" },
+      input: {
+        farm_id: "fixture-farm",
+        role_key: "water",
+        kind: "water_budget",
+        assumptions: [],
+        inputs: { available_water: { kind: "known", value: 120, unit: "m3" } },
+        evidence: [],
+      },
+      command,
+    });
+    expect(
+      await s.execute("listFacts", {
+        params: { farmId: "fixture-farm" },
+        input: {},
+      }),
+    ).toEqual(before);
+  });
+});
+
+describe("private export transport", () => {
+  it("downloads through the authenticated local path and rejects another origin", async () => {
+    const bootstrap = await createFixtureService().execute("bootstrap", {
+      input: {},
+    });
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            schema_version: CONTRACT_VERSION,
+            request_id: "r",
+            data: bootstrap,
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(new Response('{"farm":true}'));
+    const service = createHttpService(fetcher);
+    await service.execute("bootstrap", { input: {} });
+    const blob = await downloadExport(
+      service,
+      "/api/v1/farms/f/exports/j/download",
+    );
+    expect(await blob.text()).toBe('{"farm":true}');
+    expect(fetcher.mock.calls[1]?.[1]?.headers).toMatchObject({
+      "X-Sakha-Session": "fixture-session",
+    });
+    await expect(
+      downloadExport(service, "https://example.com/export"),
+    ).rejects.toThrow("Unexpected");
+    expect(fetcher).toHaveBeenCalledTimes(2);
   });
 });

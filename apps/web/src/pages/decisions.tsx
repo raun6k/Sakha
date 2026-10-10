@@ -740,9 +740,10 @@ function OutcomeForm({
 export function ActivityPage() {
   const farmId = useFarmId();
   const [kind, setKind] = useState("");
+  const [cursor, setCursor] = useState<string>();
   const q = useRead(
     "listActivity",
-    { params: { farmId }, input: { kind: kind || undefined } },
+    { params: { farmId }, input: { kind: kind || undefined }, cursor },
     Boolean(farmId),
   );
   const [work, setWork] = useState(false);
@@ -760,7 +761,13 @@ export function ActivityPage() {
         </button>
       </PageHeading>
       <Field label="Record type">
-        <select value={kind} onChange={(e) => setKind(e.target.value)}>
+        <select
+          value={kind}
+          onChange={(e) => {
+            setKind(e.target.value);
+            setCursor(undefined);
+          }}
+        >
           <option value="">All records</option>
           {[
             "finding",
@@ -852,6 +859,26 @@ export function ActivityPage() {
           </State>
         )}
       </Card>
+      <div className="actions">
+        {q.data?.next_cursor ? (
+          <button
+            type="button"
+            className="button secondary"
+            onClick={() => setCursor(q.data?.next_cursor ?? undefined)}
+          >
+            Older records
+          </button>
+        ) : null}
+        {cursor ? (
+          <button
+            type="button"
+            className="text-link"
+            onClick={() => setCursor(undefined)}
+          >
+            Return to latest records
+          </button>
+        ) : null}
+      </div>
       <p className="chart-meta">
         Correct shared facts in My Farm. Deletion and private access can remove
         historical detail consistently from derived stores.
@@ -916,6 +943,12 @@ function ActivityCorrection({
   const [edit, setEdit] = useState(false);
   const [description, setDescription] = useState(initial.description);
   const [date, setDate] = useState(initial.effective_at.slice(0, 10));
+  const [quantity, setQuantity] = useState(
+    initial.quantity?.kind === "known" ? String(initial.quantity.value) : "",
+  );
+  const [amount, setAmount] = useState(
+    initial.money ? String(initial.money.minor_units / 100) : "",
+  );
   const [confirmed, setConfirmed] = useState(false);
   return (
     <>
@@ -970,9 +1003,35 @@ function ActivityCorrection({
               onChange={(e) => setDate(e.target.value)}
             />
           </Field>
+          {initial.quantity?.kind === "known" ? (
+            <Field
+              label={`Corrected known quantity (${initial.quantity.unit})`}
+              hint="Leave blank to mark the quantity unknown."
+            >
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+              />
+            </Field>
+          ) : null}
+          <Field
+            label="Corrected known amount (INR, optional)"
+            hint="Leave blank when the amount is unknown."
+          >
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </Field>
           <p className="chart-meta">
-            Quantity and money retain the original known values. This correction
-            preserves lineage and does not duplicate work.
+            A correction preserves the original report and replaces its actual
+            quantity or spending contribution. It does not duplicate work.
           </p>
           <label className="checkbox-row">
             <input
@@ -998,8 +1057,21 @@ function ActivityCorrection({
                     confirmed_by: "farmer",
                     effective_at: new Date(`${date}T12:00:00Z`).toISOString(),
                     task_id: initial.task_id,
-                    quantity: initial.quantity,
-                    money: initial.money,
+                    quantity:
+                      initial.quantity?.kind === "known"
+                        ? quantity.trim()
+                          ? { ...initial.quantity, value: Number(quantity) }
+                          : {
+                              kind: "unknown",
+                              reason: "Farmer correction: quantity not known",
+                            }
+                        : initial.quantity,
+                    money: amount.trim()
+                      ? {
+                          minor_units: Math.round(Number(amount) * 100),
+                          currency: "INR",
+                        }
+                      : undefined,
                     corrects_id: initial.id,
                     expected_version: initial.version,
                     provenance: {

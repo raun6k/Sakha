@@ -417,6 +417,7 @@ export function QuickUpdate({
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [error, setError] = useState<unknown>();
   const [busy, setBusy] = useState(false);
+  const reportCommands = useRef(new Map<string, string>());
   const save = async () => {
     if (busy) return;
     setBusy(true);
@@ -425,11 +426,13 @@ export function QuickUpdate({
       if (!value.trim())
         throw new Error("Enter what you observed, or choose Not sure.");
       const category: Fact["category"] =
-        key === "water_availability" || key === "water_source"
-          ? "F04"
-          : key === "crop_condition" || key === "observation"
-            ? "F06"
-            : "F03";
+        key === "resources"
+          ? "F02"
+          : key === "water_availability" || key === "water_source"
+            ? "F04"
+            : key === "crop_condition" || key === "observation"
+              ? "F06"
+              : "F03";
       const input = reportedFact(
         farmId,
         key,
@@ -441,16 +444,36 @@ export function QuickUpdate({
       );
       input.provenance.effective_time_precision = "date";
       const prior = facts.data?.items.filter((f) => f.key === key).at(-1);
+      const hash = JSON.stringify({
+        input,
+        priorId: prior?.id,
+        priorVersion: prior?.version,
+      });
+      let identity = reportCommands.current.get(hash);
+      if (!identity) {
+        identity = crypto.randomUUID();
+        reportCommands.current.set(hash, identity);
+      }
       if (prior)
-        await executeCommand(service, "correctFact", {
-          params: { farmId, factId: prior.id },
-          input: { ...input, expected_version: prior.version },
-        });
+        await executeCommand(
+          service,
+          "correctFact",
+          {
+            params: { farmId, factId: prior.id },
+            input: { ...input, expected_version: prior.version },
+          },
+          identity,
+        );
       else
-        await executeCommand(service, "saveFact", {
-          params: { farmId },
-          input,
-        });
+        await executeCommand(
+          service,
+          "saveFact",
+          {
+            params: { farmId },
+            input,
+          },
+          identity,
+        );
       await client.invalidateQueries({ queryKey: ["sakha", farmId] });
       setValue("");
       onClose();
@@ -483,6 +506,7 @@ export function QuickUpdate({
             ["current_crop", "Current crop"],
             ["intended_crop", "Intended crop"],
             ["observation", "Field observation"],
+            ["resources", "Equipment and resource constraints"],
           ].map(([v, l]) => (
             <option key={v} value={v}>
               {l}

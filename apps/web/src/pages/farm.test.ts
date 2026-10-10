@@ -116,3 +116,23 @@ describe("farmer setup and updates", () => {
     ).toEqual({ kind: "qualitative", text: "Little" });
   });
 });
+
+it("keeps the same command identity when a farmer explicitly retries an uncertain report", async () => {
+  const service = createFixtureService({ failure: "saveFact" });
+  const execute = vi.spyOn(service, "execute");
+  const user = userEvent.setup();
+  mount(h(QuickUpdate, { open: true, onClose: vi.fn() }), service);
+  await user.selectOptions(screen.getByLabelText("Your report"), "Flowering");
+  await user.click(screen.getByRole("button", { name: "Save farm update" }));
+  await screen.findByRole("alert");
+  await user.click(screen.getByRole("button", { name: "Save farm update" }));
+  await waitFor(() =>
+    expect(
+      execute.mock.calls.filter(([name]) => name === "saveFact"),
+    ).toHaveLength(2),
+  );
+  const calls = execute.mock.calls.filter(([name]) => name === "saveFact");
+  expect(calls[0]?.[1]?.command?.idempotency_key).toBe(
+    calls[1]?.[1]?.command?.idempotency_key,
+  );
+});

@@ -61,6 +61,18 @@ function responseError(json: unknown, status: number): ApiError {
           request_id: "response",
         };
 }
+const exportDownloads = new WeakMap<
+  SakhaService,
+  (url: string) => Promise<Blob>
+>();
+export async function downloadExport(service: SakhaService, url: string) {
+  const download = exportDownloads.get(service);
+  if (!download)
+    throw new Error(
+      "Export download is available for the real local backend only.",
+    );
+  return download(url);
+}
 export function createHttpService(fetcher: typeof fetch = fetch): SakhaService {
   let token: string | undefined;
   let renewal: Promise<void> | undefined;
@@ -139,7 +151,7 @@ export function createHttpService(fetcher: typeof fetch = fetch): SakhaService {
       token = String(result.session_token);
     return result as OperationOutput<K>;
   }
-  return {
+  const service: SakhaService = {
     execute,
     subscribe(farmId, cursor, onEvent, onError, onConnection) {
       const controller = new AbortController();
@@ -241,4 +253,18 @@ export function createHttpService(fetcher: typeof fetch = fetch): SakhaService {
       return () => controller.abort();
     },
   };
+  exportDownloads.set(service, async (url) => {
+    if (!/^\/api\/v1\/farms\/[^/?]+\/exports\/[^/?]+\/download$/.test(url))
+      throw new Error("Unexpected export download location.");
+    const response = await fetcher(url, {
+      headers: token ? { "X-Sakha-Session": token } : {},
+      credentials: "same-origin",
+    });
+    if (!response.ok)
+      throw new Error(
+        "Export could not be downloaded. Refresh saved status and retry.",
+      );
+    return response.blob();
+  });
+  return service;
 }

@@ -347,6 +347,11 @@ export function ConversationView({ role }: { role: Role }) {
     { params: { farmId }, input: { role_key: role.key } },
     Boolean(farmId),
   );
+  const selectedAlert = useRead(
+    "getAlert",
+    { params: { farmId, alertId: search.get("alert") ?? "" }, input: {} },
+    Boolean(farmId && search.get("alert")),
+  );
   const [createdId, setCreatedId] = useState("");
   const cid = search.get("conversation") ?? createdId ?? "";
   const conversationId = cid || conversations.data?.items[0]?.id || "";
@@ -430,6 +435,17 @@ export function ConversationView({ role }: { role: Role }) {
   }, [farmId, service, client]);
   const send = async (value: string) => {
     if (submission.current || !value.trim() || !canChat) return;
+    if (active || (conversationId && storedRuns.isPending)) {
+      setText(role.key, value);
+      setError(
+        new Error(
+          active
+            ? "A response is already in progress. Wait or stop it before sending this draft."
+            : "Restoring saved response state. Your question is kept as a draft.",
+        ),
+      );
+      return;
+    }
     submission.current = true;
     setBusy(true);
     setError(undefined);
@@ -467,7 +483,7 @@ export function ConversationView({ role }: { role: Role }) {
                       snapshot_id: search.get("snapshot") ?? "",
                     },
                   ]
-                : [],
+                : (selectedAlert.data?.evidence ?? []),
           },
         },
         command.key,
@@ -489,7 +505,13 @@ export function ConversationView({ role }: { role: Role }) {
       question?: string;
       questionId?: string;
     } | null;
-    if (state?.question && !homeConsumed.current && conversations.isSuccess) {
+    if (
+      state?.question &&
+      !homeConsumed.current &&
+      conversations.isSuccess &&
+      (!conversationId || storedRuns.isSuccess) &&
+      (!runId || run.isSuccess)
+    ) {
       homeConsumed.current = true;
       setText(role.key, state.question);
       navigate(location.pathname + location.search, {
@@ -630,7 +652,9 @@ export function ConversationView({ role }: { role: Role }) {
       {connection ? (
         <State title="Updates disconnected">{connection}</State>
       ) : null}
-      <ErrorNotice error={error ?? messages.error ?? cancel.error} />
+      <ErrorNotice
+        error={error ?? messages.error ?? cancel.error ?? selectedAlert.error}
+      />
       {findings.data?.items.map((f) => (
         <Card key={f.id} title={f.title}>
           <p>{f.summary}</p>
@@ -665,7 +689,14 @@ export function ConversationView({ role }: { role: Role }) {
         <button
           className="button"
           type="submit"
-          disabled={busy || Boolean(active) || !canChat || !text.trim()}
+          disabled={
+            busy ||
+            Boolean(active) ||
+            !canChat ||
+            !text.trim() ||
+            Boolean(conversationId && storedRuns.isPending) ||
+            Boolean(search.get("alert") && !selectedAlert.data)
+          }
           aria-label="Send question"
         >
           <Send size={20} />
@@ -1262,6 +1293,121 @@ function ScenarioBuilder({
     </Card>
   );
 }
+function CropPhoto({ role }: { role: Role }) {
+  const farmId = useFarmId();
+  const upload = useCommand("uploadAttachment", { farmId });
+  const [file, setFile] = useState<File>();
+  const [confirmed, setConfirmed] = useState(false);
+  const [error, setError] = useState<unknown>();
+  const [saved, setSaved] = useState<import("@sakha/contracts").Attachment>();
+  const remove = useCommand("deleteAttachment", {
+    farmId,
+    attachmentId: saved?.id ?? "",
+  });
+  const enabled = role.capabilities.some(
+    (c) => c.key === "photo_upload" && c.status === "enabled",
+  );
+  async function save() {
+    if (!file || !confirmed) return;
+    setError(undefined);
+    try {
+      if (
+        !["image/png", "image/jpeg", "image/webp"].includes(file.type) ||
+        file.size > 8 * 1024 * 1024
+      )
+        throw new Error("Choose a PNG, JPEG or WebP image up to 8 MB.");
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let binary = "";
+      for (let i = 0; i < bytes.length; i += 8192)
+        binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+      const result = await upload.mutateAsync({
+        name: file.name,
+        media_type: file.type,
+        data_base64: btoa(binary),
+      });
+      setSaved(result);
+      setFile(undefined);
+      setConfirmed(false);
+    } catch (e) {
+      setError(e);
+    }
+  }
+  return (
+    <Card title="Crop photos">
+      <p>
+        Photos are private local attachments. Upload does not diagnose a crop or
+        send the image to a model provider.
+      </p>
+      <Field label="Photo (PNG, JPEG or WebP, up to 8 MB)">
+        <input
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          disabled={!enabled}
+          onChange={(e) => {
+            setFile(e.target.files?.[0]);
+            setConfirmed(false);
+          }}
+        />
+      </Field>
+      {enabled ? (
+        <>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={confirmed}
+              onChange={(e) => setConfirmed(e.target.checked)}
+            />
+            Save this selected photo privately with my farm.
+          </label>
+          <button
+            type="button"
+            className="button secondary"
+            disabled={!file || !confirmed || upload.isPending}
+            onClick={() => void save()}
+          >
+            Save crop photo
+          </button>
+        </>
+      ) : (
+        <State title="Photo upload unavailable">
+          {role.capabilities.find((c) => c.key === "photo_upload")?.reason ??
+            "The backend has not enabled photo storage."}
+        </State>
+      )}
+      <ErrorNotice error={error ?? remove.error} />
+      {saved ? (
+        <div className="notice">
+          <div>
+            <h3>{saved.name}</h3>
+            <p>
+              {saved.size_bytes} bytes · {saved.analysis_capability.reason}
+            </p>
+            <button
+              type="button"
+              className="text-link"
+              disabled={remove.isPending}
+              onClick={() =>
+                void remove
+                  .mutateAsync({
+                    confirmed: true,
+                    expected_version: saved.version,
+                  })
+                  .then(() => setSaved(undefined))
+                  .catch(() => {})
+              }
+            >
+              Delete this private photo
+            </button>
+          </div>
+        </div>
+      ) : null}
+      <State title="Photo analysis unavailable">
+        Current runtimes are text only. A supported analysis capability and
+        separate processing consent are required before any image is sent.
+      </State>
+    </Card>
+  );
+}
 function RolePanels({ role }: { role: Role }) {
   const farmId = useFarmId();
   const insights = useRead(
@@ -1292,13 +1438,15 @@ function RolePanels({ role }: { role: Role }) {
           {insights.data?.series
             .filter((s) =>
               role.key === "climate"
-                ? s.source_id === "C01"
-                : s.source_id !== "C01",
+                ? s.source_id.startsWith("C")
+                : s.source_id.startsWith("W"),
             )
             .map((s) => (
               <ChartCard key={s.id} series={s} />
             ))}
-          {!insights.data?.series.length ? (
+          {!insights.data?.series.some((s) =>
+            s.source_id.startsWith(role.key === "climate" ? "C" : "W"),
+          ) ? (
             <Card>
               <State title="Source information unavailable">
                 A validated source, supported range and applicable geography are
@@ -1347,6 +1495,7 @@ function RolePanels({ role }: { role: Role }) {
             ))}
         </Card>
       ) : null}
+      {role.key === "crop_care" ? <CropPhoto role={role} /> : null}
       {(tools[role.key] ?? []).map((tool) => (
         <ScenarioBuilder key={tool.kind} role={role} tool={tool} />
       ))}

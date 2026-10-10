@@ -713,6 +713,8 @@ export function createFixtureService(
         return find(history, params.outcomeId);
       case "recordActivity":
       case "correctActivity": {
+        if (name === "correctActivity")
+          version(find(activities, params.activityId));
         const activity = c.Activity.parse({
           ...base(),
           ...input,

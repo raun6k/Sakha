@@ -13,7 +13,7 @@ import {
   Sprout,
   Users,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet } from "react-router";
 import { bootstrapFarm, useRead, useService } from "../services/context";
 import { Modal } from "./ui";
@@ -48,6 +48,11 @@ export function Shell() {
   const { demo } = useService();
   const [more, setMore] = useState(false);
   const bootstrap = useRead("bootstrap", { input: {} });
+  useEffect(() => {
+    document.documentElement.dataset.reducedMotion = String(
+      bootstrap.data?.settings.reduced_motion ?? false,
+    );
+  }, [bootstrap.data?.settings.reduced_motion]);
   const farm = bootstrap.data ? bootstrapFarm(bootstrap.data) : undefined;
   return (
     <div className="app-shell">

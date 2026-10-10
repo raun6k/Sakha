@@ -109,7 +109,7 @@ export function State({
       <Info size={22} />
       <div>
         <h3>{title}</h3>
-        {children ? <p>{children}</p> : null}
+        {children ? <div className="state-copy">{children}</div> : null}
         {retry ? (
           <button type="button" className="button secondary" onClick={retry}>
             Try again

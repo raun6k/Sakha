@@ -253,10 +253,11 @@ export function ChartCard({
                 y="158"
                 className="chart-label"
               >
-                {new Date(p.time).toLocaleDateString("en-IN", {
-                  month: "short",
-                  day: "numeric",
-                })}
+                {p.label ??
+                  new Date(p.time).toLocaleDateString("en-IN", {
+                    month: "short",
+                    day: "numeric",
+                  })}
               </text>
             ))}
         </svg>
@@ -303,7 +304,9 @@ export function ChartCard({
             <tbody>
               {points.map((p) => (
                 <tr key={p.time}>
-                  <td>{new Date(p.time).toLocaleDateString("en-IN")}</td>
+                  <td>
+                    {p.label ?? new Date(p.time).toLocaleDateString("en-IN")}
+                  </td>
                   <td>{p.value ?? "Missing"}</td>
                   <td>
                     {p.lower !== undefined || p.upper !== undefined

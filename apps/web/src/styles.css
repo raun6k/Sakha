@@ -387,8 +387,8 @@ main {
   background: transparent;
   color: var(--green);
   padding: 8px;
-  min-height: 40px;
-  min-width: 40px;
+  min-height: 44px;
+  min-width: 44px;
 }
 .icon-button:hover {
   background: #eff3e9;
@@ -522,7 +522,7 @@ main {
   align-items: flex-start;
   color: #4f6859;
 }
-.state-panel p {
+.state-panel :where(p, .state-copy) {
   margin-top: 6px;
   font-size: 0.94rem;
   max-width: 70ch;

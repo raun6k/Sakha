@@ -20,6 +20,7 @@ import {
   useRead,
   useService,
 } from "../services/context";
+import { downloadExport } from "../services/http";
 export function InsightsPage() {
   const farmId = useFarmId();
   const [search, setSearch] = useSearchParams();
@@ -294,6 +295,11 @@ function ConsentPanel() {
         Optional private information and external processing require explicit
         scope.
       </p>
+      <p className="chart-meta">
+        Standard scope covers farm location, equipment, cultivation, water and
+        reported crop observations for the farming roles. Finance and support
+        details require the separate choices below.
+      </p>
       <Field label="Purpose">
         <input value={purpose} onChange={(e) => setPurpose(e.target.value)} />
       </Field>
@@ -303,8 +309,8 @@ function ConsentPanel() {
           checked={external}
           onChange={(e) => setExternal(e.target.checked)}
         />
-        Allow authorized conversation context to be sent to the configured model
-        provider
+        Allow my conversation text and authorized farm context to be sent to the
+        configured model provider
       </label>
       <label className="checkbox-row">
         <input
@@ -343,6 +349,8 @@ function ConsentPanel() {
               fields: [
                 "conversation",
                 "F01",
+                "F02",
+                "F06",
                 "F03",
                 "F04",
                 ...(financial ? ["F05"] : []),
@@ -493,9 +501,24 @@ function LifecyclePanel() {
             <p>{job.progress}</p>
             {job.failure ? <p>{job.failure}</p> : null}
             {job.download_url ? (
-              <a className="text-link" href={job.download_url}>
+              <button
+                type="button"
+                className="text-link"
+                onClick={() =>
+                  void downloadExport(service, job.download_url ?? "")
+                    .then((blob) => {
+                      const url = URL.createObjectURL(blob);
+                      const link = document.createElement("a");
+                      link.href = url;
+                      link.download = `sakha-export-${job.id}.json`;
+                      link.click();
+                      setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    })
+                    .catch(setError)
+                }
+              >
                 Download prepared export
-              </a>
+              </button>
             ) : null}
           </div>
         </div>
