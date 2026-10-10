@@ -88,8 +88,15 @@ export type RuntimeTurn = {
   instructions: string;
   signal: AbortSignal;
   onText: (text: string) => Promise<void>;
+  beforeSend: () => Promise<void>;
   tools: {
     readFacts: () => Promise<c.Fact[]>;
+    lookupEvidence: (query: {
+      source_id?: string;
+      text?: string;
+    }) => Promise<c.Evidence[]>;
+    scenario: (request: unknown) => Promise<c.Scenario>;
+    proposePlan: (request: unknown) => Promise<c.PlanRevision>;
     publishFinding: (finding: unknown) => Promise<c.Finding>;
     peer: (
       recipient: c.RoleKey,
@@ -276,6 +283,7 @@ export function createCoreServices(
             store.put("message", message);
             const run = c.Run.parse({
               ...base(farmId),
+              field_id: d.field_id,
               conversation_id: conversation.id,
               role_key: conversation.role_key,
               state: "queued",
@@ -285,6 +293,28 @@ export function createCoreServices(
             saveRun(run);
             store.enqueue(farmId, "agent_turn", { run_id: run.id });
             return run;
+          }
+          case "listRuns": {
+            const d = c.operations.listRuns.input.parse(input);
+            if (d.conversation_id)
+              load(
+                store,
+                "conversation",
+                d.conversation_id,
+                farmId,
+                c.Conversation,
+              );
+            return {
+              items: store
+                .list("run", farmId)
+                .map((x) => c.Run.parse(x))
+                .filter(
+                  (x) =>
+                    !d.conversation_id ||
+                    x.conversation_id === d.conversation_id,
+                ),
+              next_cursor: null,
+            };
           }
           case "getRun":
             return load(store, "run", params.runId ?? "", farmId, c.Run);

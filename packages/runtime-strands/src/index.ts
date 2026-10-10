@@ -60,13 +60,54 @@ function sdkDriver(
     updated_at: true,
     role_key: true,
     origin: true,
-  });
+  }).strict();
   const tools = [
+    tool({
+      name: "lookup_evidence",
+      description:
+        "Find actual saved public evidence permitted for this role and field; results retain freshness and provenance.",
+      inputSchema: z
+        .object({
+          source_id: z.string().optional(),
+          text: z.string().max(1000).optional(),
+        })
+        .strict(),
+      callback: async (input) => {
+        check();
+        return JSON.stringify(await turn.tools.lookupEvidence(input));
+      },
+    }),
+    tool({
+      name: "calculate_scenario",
+      description:
+        "Run the deterministic domain calculator. Missing sourced methods and measurements remain unknown.",
+      inputSchema: c.ScenarioRequest.omit({
+        farm_id: true,
+        field_id: true,
+        role_key: true,
+      }).strict(),
+      callback: async (input) => {
+        check();
+        return JSON.stringify(await turn.tools.scenario(input));
+      },
+    }),
+    tool({
+      name: "propose_plan",
+      description:
+        "Create a reviewable revision. Does not approve or complete work. Chief of Staff only.",
+      inputSchema: c.operations.createPlanRevision.input
+        .omit({ farm_id: true, field_id: true })
+        .strict(),
+      callback: async (input) => {
+        check();
+        return JSON.stringify(await turn.tools.proposePlan(input));
+      },
+    }),
     tool({
       name: "read_farm_facts",
       description:
         "Read authorized immutable farmer fact context. No identity arguments.",
-      inputSchema: z.object({}),
+      inputSchema: z.object({}).strict(),
       callback: async () => {
         check();
         return JSON.stringify(await turn.tools.readFacts());
@@ -86,10 +127,12 @@ function sdkDriver(
       name: "request_specialist",
       description:
         "Send a permitted durable peer request. Queued acknowledgement is not a specialist answer.",
-      inputSchema: z.object({
-        recipient: c.RoleKey,
-        text: z.string().min(1).max(10000),
-      }),
+      inputSchema: z
+        .object({
+          recipient: c.RoleKey,
+          text: z.string().min(1).max(10000),
+        })
+        .strict(),
       callback: async (input) => {
         check();
         return JSON.stringify(
@@ -193,16 +236,38 @@ export class StrandsRuntime implements Runtime {
         "unavailable",
         "Configure OPENAI_API_KEY and SAKHA_OPENAI_MODEL, or OS keyring reference",
       );
-    const driver = this.driverFactory(this.config, key, turn);
+    const timeoutController = new AbortController();
+    const signal = AbortSignal.any([turn.signal, timeoutController.signal]);
+    const driver = this.driverFactory(this.config, key, { ...turn, signal });
     this.active.set(turn.run.id, driver);
-    const timeout = setTimeout(
-      () => driver.cancel(),
-      this.config.timeoutMs ?? 120000,
-    );
+    const timeout = setTimeout(() => {
+      timeoutController.abort();
+      driver.cancel();
+    }, this.config.timeoutMs ?? 120000);
     let text = "",
       completed = false;
+    let abortListener: () => void = () => {};
+    const stopped = new Promise<never>((_, reject) => {
+      abortListener = () => {
+        driver.cancel();
+        reject(
+          new DomainError(
+            "interrupted",
+            "Turn cancelled or exceeded its time bound",
+          ),
+        );
+      };
+      signal.addEventListener("abort", abortListener, { once: true });
+      if (signal.aborted) abortListener();
+    });
+    void stopped.catch(() => {});
     try {
-      for await (const raw of driver.stream()) {
+      await turn.beforeSend();
+      const iterator = driver.stream()[Symbol.asyncIterator]();
+      for (;;) {
+        const next = await Promise.race([iterator.next(), stopped]);
+        if (next.done) break;
+        const raw = next.value;
         if (turn.signal.aborted)
           throw new DomainError("interrupted", "Turn cancelled");
         const event = z
@@ -258,6 +323,7 @@ export class StrandsRuntime implements Runtime {
       throw runtimeFailure(error);
     } finally {
       clearTimeout(timeout);
+      signal.removeEventListener("abort", abortListener);
       this.active.delete(turn.run.id);
     }
   }

@@ -12,8 +12,13 @@ function turn(onText: (text: string) => Promise<void>): RuntimeTurn {
     instructions: "Test instructions",
     signal: new AbortController().signal,
     onText,
+    beforeSend: async () => {},
     tools: {
       readFacts: async () => [],
+      lookupEvidence: async () => [],
+      scenario: async () => c.Scenario.parse(responseExamples.getScenario),
+      proposePlan: async () =>
+        c.PlanRevision.parse(responseExamples.getPlanRevision),
       publishFinding: async () => c.Finding.parse(responseExamples.getFinding),
       peer: async () => ({ id: "peer", status: "queued" }),
       clarify: async () => {},
@@ -96,5 +101,20 @@ it("reports missing credentials unavailable and rejects malformed/limited final 
   );
   await expect(runtime.startTurn(turn(async () => {}))).rejects.toThrow(
     "limitTurns",
+  );
+});
+it("bounds a provider that ignores cancellation", async () => {
+  const runtime = new StrandsRuntime(
+    { model: "test", apiKey: "synthetic", timeoutMs: 10 },
+    () => ({
+      cancel() {},
+      async *stream() {
+        await new Promise(() => {});
+        yield {};
+      },
+    }),
+  );
+  await expect(runtime.startTurn(turn(async () => {}))).rejects.toThrow(
+    "time bound",
   );
 });
