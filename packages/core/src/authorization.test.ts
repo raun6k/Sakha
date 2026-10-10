@@ -31,5 +31,13 @@ it("actual Cedar denies foreign farm, missing private grant and farmer decision 
   expect(() =>
     authorize(principal, "decide_plan", { id: "record", farmId: "a" }, true),
   ).toThrow("not permitted");
+  expect(() =>
+    authorize(
+      principal,
+      "invented_action",
+      { id: "record", farmId: "a" },
+      true,
+    ),
+  ).toThrow("not permitted");
   expect(effects).toBe(1);
 });

@@ -1,4 +1,9 @@
-import { isAuthorized } from "@cedar-policy/cedar-wasm/nodejs";
+import { readFileSync } from "node:fs";
+import {
+  checkParsePolicySet,
+  checkParseSchema,
+  isAuthorized,
+} from "@cedar-policy/cedar-wasm/nodejs";
 import * as c from "@sakha/contracts";
 import { DomainError, load, requireVersion, type Store } from "@sakha/farm";
 export type BoundPrincipal = {
@@ -8,8 +13,30 @@ export type BoundPrincipal = {
   roleKey?: c.RoleKey;
   runId?: string;
 };
-export const policyText = `permit(principal is Sakha::Farmer, action, resource is Sakha::Resource) when { principal.farm == resource.farm && context.allowed };
-permit(principal is Sakha::Agent, action, resource is Sakha::Resource) when { principal.farm == resource.farm && context.allowed && (!resource.private || context.privateGrant) } unless { action == Sakha::Action::"record_work" || action == Sakha::Action::"decide_plan" || action == Sakha::Action::"save_fact" };`;
+export const policyText = readFileSync(
+  new URL("../../../policies/sakha-v1.cedar", import.meta.url),
+  "utf8",
+);
+const policySchema = readFileSync(
+  new URL("../../../policies/sakha-v1.cedarschema", import.meta.url),
+  "utf8",
+);
+if (
+  checkParseSchema(policySchema).type === "failure" ||
+  checkParsePolicySet({ staticPolicies: policyText }).type === "failure"
+)
+  throw new Error("Invalid Sakha authorization policy");
+export const roleFactCategories: Record<c.RoleKey, readonly string[]> = {
+  chief_of_staff: ["F01", "F02", "F03", "F04", "F05", "F06", "F07", "F08"],
+  climate: ["F01", "F03", "F04"],
+  weather: ["F01", "F03", "F06"],
+  crop_planning: ["F01", "F02", "F03", "F04", "F05"],
+  crop_care: ["F01", "F02", "F03", "F04", "F06"],
+  water: ["F01", "F02", "F03", "F04"],
+  market: ["F01", "F03", "F07"],
+  farm_finance: ["F01", "F03", "F05", "F07"],
+  government_support: ["F01", "F03", "F06", "F08"],
+};
 export function authorize(
   principal: BoundPrincipal,
   action: string,
@@ -22,6 +49,8 @@ export function authorize(
   const principalUid = { type: principalType, id: principal.id };
   const resourceUid = { type: "Sakha::Resource", id: resource.id };
   const result = isAuthorized({
+    schema: policySchema,
+    validateRequest: true,
     principal: principalUid,
     action: { type: "Sakha::Action", id: action },
     resource: resourceUid,
@@ -88,8 +117,14 @@ export function createCoreServices(
   listFacts: (farmId: string) => c.Fact[],
   now: () => string,
 ) {
-  function contextFacts(farmId: string, roleKey: c.RoleKey, external = false) {
+  function contextFacts(
+    farmId: string,
+    roleKey: c.RoleKey,
+    external = false,
+    fieldId?: string,
+  ) {
     assertFarm(farmId);
+    if (fieldId) load(store, "field", fieldId, farmId, c.Field);
     const grants = store
       .list("consent", farmId)
       .map((x) => c.Consent.parse(x))
@@ -101,7 +136,13 @@ export function createCoreServices(
       );
     return listFacts(farmId).filter(
       (fact) =>
-        !fact.private || grants.some((g) => g.fields.includes(fact.key)),
+        roleFactCategories[roleKey].includes(fact.category) &&
+        (!fact.field_id || fact.field_id === fieldId) &&
+        ((!fact.private && !external) ||
+          grants.some(
+            (g) =>
+              g.fields.includes(fact.key) || g.fields.includes(fact.category),
+          )),
     );
   }
   function saveRun(run: c.Run) {
@@ -141,6 +182,13 @@ export function createCoreServices(
           }
           case "createConversation": {
             const d = c.operations.createConversation.input.parse(input);
+            if (!store.get("agent_instance", d.role_key, farmId))
+              store.put("agent_instance", {
+                ...base(farmId),
+                id: d.role_key,
+                role_key: d.role_key,
+                runtime: "unconfigured",
+              });
             const conversation = c.Conversation.parse({
               ...d,
               ...base(farmId),
@@ -204,7 +252,12 @@ export function createCoreServices(
             if (d.field_id) load(store, "field", d.field_id, farmId, c.Field);
             for (const ref of d.evidence)
               load(store, "evidence", ref.evidence_id, farmId, c.Evidence);
-            const facts = contextFacts(farmId, conversation.role_key);
+            const facts = contextFacts(
+              farmId,
+              conversation.role_key,
+              false,
+              d.field_id,
+            );
             const message = c.Message.parse({
               ...base(farmId),
               conversation_id: conversation.id,

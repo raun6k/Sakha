@@ -1,0 +1,14 @@
+namespace Sakha {
+ entity Farmer {farm: String};
+ entity Agent {farm: String};
+ entity Resource {farm: String, private: Bool};
+action "read" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool}};
+action "write" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool}};
+action "memory" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool}};
+action "propose" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool}};
+action "peer" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool}};
+action "clarify" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool}};
+action "record_work" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool}};
+action "decide_plan" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool}};
+action "save_fact" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool}};
+}
