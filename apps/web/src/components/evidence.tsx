@@ -83,7 +83,12 @@ export function SourceDetails({
                 <div>
                   <dt>Issued</dt>
                   <dd>
-                    <DateText value={evidence.data.issued_at} />
+                    <DateText
+                      value={evidence.data.issued_at}
+                      precision={
+                        evidence.data.source_time_precision ?? "unknown"
+                      }
+                    />
                   </dd>
                 </div>
                 <div>
@@ -95,7 +100,12 @@ export function SourceDetails({
                 <div>
                   <dt>Valid until</dt>
                   <dd>
-                    <DateText value={evidence.data.valid_until} />
+                    <DateText
+                      value={evidence.data.valid_until}
+                      precision={
+                        evidence.data.source_time_precision ?? "unknown"
+                      }
+                    />
                   </dd>
                 </div>
                 <div>
@@ -105,6 +115,16 @@ export function SourceDetails({
                     {evidence.data.resolution ?? "Not recorded"}
                   </dd>
                 </div>
+                {evidence.data.grid ? (
+                  <div>
+                    <dt>Selected native grid</dt>
+                    <dd>
+                      {evidence.data.grid.latitude},{" "}
+                      {evidence.data.grid.longitude} · {evidence.data.grid.crs}
+                      <br />A regional cell, not a direct field measurement.
+                    </dd>
+                  </div>
+                ) : null}
                 <div>
                   <dt>Units / method</dt>
                   <dd>
