@@ -21,6 +21,7 @@ export const Origin = z.enum([
   "imported_source",
   "farmer_report",
   "derived_calculation",
+  "agent_inference",
   "fixture",
 ]);
 export const Capability = z.object({
