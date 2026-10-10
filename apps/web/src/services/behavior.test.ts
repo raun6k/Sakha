@@ -107,18 +107,16 @@ describe("transport and streaming", () => {
     ).toBe("/api/v1/farms/farm%20one/insights?series=C01&range=5years");
   });
   it("validates malformed successful backend responses instead of inventing data", async () => {
-    const fetcher = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            schema_version: CONTRACT_VERSION,
-            request_id: "r",
-            data: { name: "invalid" },
-          }),
-          { status: 200 },
-        ),
-      );
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          schema_version: CONTRACT_VERSION,
+          request_id: "r",
+          data: { name: "invalid" },
+        }),
+        { status: 200 },
+      ),
+    );
     const s = createHttpService(fetcher);
     await expect(
       s.execute("getFarm", { params: { farmId: "f" }, input: {} }),

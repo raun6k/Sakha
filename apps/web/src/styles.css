@@ -897,14 +897,14 @@ main {
   *,
   *::before,
   *::after {
-    animation: none !important;
-    transition: none !important;
-    scroll-behavior: auto !important;
+    animation: none;
+    transition: none;
+    scroll-behavior: auto;
   }
 }
 [data-reduced-motion="true"] * {
-  animation: none !important;
-  transition: none !important;
+  animation: none;
+  transition: none;
 }
 @media (max-width: 1150px) {
   .grid-4 {

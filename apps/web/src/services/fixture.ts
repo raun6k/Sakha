@@ -200,14 +200,14 @@ export function createFixtureService(
       ],
     }),
   );
-  let prefs: Record<string, c.Preferences> = {};
+  const prefs: Record<string, c.Preferences> = {};
   let conversations: c.Conversation[] = [];
   let messages: c.Message[] = [];
-  let runs: c.Run[] = [];
+  const runs: c.Run[] = [];
   let consents: c.Consent[] = [];
   let history: c.HistoryEntry[] = [];
-  let jobs: c.Job[] = [];
-  let scenarios: c.Scenario[] = [];
+  const jobs: c.Job[] = [];
+  const scenarios: c.Scenario[] = [];
   let tasks: c.Task[] = [
     c.Task.parse({
       ...base("fixture-task"),
@@ -236,7 +236,7 @@ export function createFixtureService(
       missing_inputs: [],
     }),
   ];
-  let alerts: c.Alert[] = [
+  const alerts: c.Alert[] = [
     c.Alert.parse({
       ...base("fixture-alert"),
       title: "Crop observation needed",

@@ -111,7 +111,7 @@ export function State({
         <h3>{title}</h3>
         {children ? <p>{children}</p> : null}
         {retry ? (
-          <button className="button secondary" onClick={retry}>
+          <button type="button" className="button secondary" onClick={retry}>
             Try again
           </button>
         ) : null}
@@ -183,11 +183,14 @@ export function Field({
   hint?: string;
 }) {
   return (
-    <label className="field">
-      <span>{label}</span>
-      {children}
+    <div className="field">
+      {/* biome-ignore lint/a11y/noLabelWithoutControl: Each Field caller supplies a nested native input/select/textarea. */}
+      <label style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+        <span>{label}</span>
+        {children}
+      </label>
       {hint ? <small>{hint}</small> : null}
-    </label>
+    </div>
   );
 }
 export function quantityText(
@@ -241,6 +244,7 @@ export function RoleCard({ role, info }: { role: Role; info?: () => void }) {
         </Link>
         {info ? (
           <button
+            type="button"
             className="icon-button"
             aria-label={`About ${role.name}`}
             onClick={info}
@@ -266,7 +270,7 @@ export function SourceCard({
         <p>{source.definition}</p>
         <Badge>{source.capability.status.replaceAll("_", " ")}</Badge>
       </div>
-      <button className="button secondary" onClick={onOpen}>
+      <button type="button" className="button secondary" onClick={onOpen}>
         Source details
       </button>
     </div>

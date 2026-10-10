@@ -145,8 +145,8 @@ export function createHttpService(fetcher: typeof fetch = fetch): SakhaService {
               buffer += decoder
                 .decode(chunk.value, { stream: true })
                 .replaceAll("\r\n", "\n");
-              let end: number;
-              while ((end = buffer.indexOf("\n\n")) >= 0) {
+              let end = buffer.indexOf("\n\n");
+              while (end >= 0) {
                 const block = buffer.slice(0, end);
                 buffer = buffer.slice(end + 2);
                 const data = block
@@ -159,9 +159,10 @@ export function createHttpService(fetcher: typeof fetch = fetch): SakhaService {
                 if (event.farm_id !== farmId) continue;
                 last = event.cursor;
                 onEvent(event);
+                end = buffer.indexOf("\n\n");
               }
             }
-          } catch (error) {
+          } catch {
             if (controller.signal.aborted) break;
             onError({
               code: "unavailable",
