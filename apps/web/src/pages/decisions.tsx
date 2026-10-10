@@ -290,6 +290,7 @@ function PlanReview({
                 reason: reason || undefined,
               })
               .then(onClose)
+              .catch(() => {})
           }
         >
           {command.isPending ? "Recording decision…" : "Confirm decision"}
@@ -342,6 +343,7 @@ function DeferTask({ task, onClose }: { task: Task; onClose: () => void }) {
                   : undefined,
               })
               .then(onClose)
+              .catch(() => {})
           }
         >
           Confirm deferral
@@ -726,6 +728,7 @@ function OutcomeForm({
                   entry?.kind === "finding" ? entry.record_id : undefined,
               })
               .then(onClose)
+              .catch(() => {})
           }
         >
           Save reported outcome
@@ -1082,6 +1085,7 @@ function ActivityCorrection({
                     },
                   })
                   .then(onClose)
+                  .catch(() => {})
               }
             >
               Confirm correction
@@ -1161,6 +1165,7 @@ function OutcomeCorrection({
                   effective_at: new Date(`${date}T12:00:00Z`).toISOString(),
                 })
                 .then(onClose)
+                .catch(() => {})
             }
           >
             Confirm outcome correction

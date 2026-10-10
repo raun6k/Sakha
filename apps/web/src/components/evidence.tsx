@@ -305,7 +305,9 @@ export function ChartCard({
         <br />
         {series.kind === "forecast"
           ? "Forecast within supported horizon"
-          : "Observed series"}{" "}
+          : series.source_id === "W03"
+            ? "Historical gridded estimate"
+            : "Observed series"}{" "}
         · {series.completeness} coverage · {series.freshness.status}
         <br />
         Period{" "}

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { emptyStream, reconcileEvent } from "../state/stream";
 import { createFixtureService } from "./fixture";
 import { createHttpService, downloadExport, operationUrl } from "./http";
+import { supportsRequestedInterval } from "./series";
 
 const command = { idempotency_key: "command-1" };
 describe("command lifecycle in synthetic adapter", () => {
@@ -418,4 +419,22 @@ describe("private export transport", () => {
     ).rejects.toThrow("Unexpected");
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
+});
+
+it("refuses to treat filtered monthly totals as a daily rainfall view", () => {
+  expect(
+    supportsRequestedInterval({ source_id: "W03", unit: "mm/month" }, "30days"),
+  ).toBe(false);
+  expect(
+    supportsRequestedInterval({ source_id: "W03", unit: "mm/day" }, "30days"),
+  ).toBe(true);
+  expect(
+    supportsRequestedInterval({ source_id: "W03", unit: "mm/day" }, "12months"),
+  ).toBe(false);
+  expect(
+    supportsRequestedInterval(
+      { source_id: "W03", unit: "mm/month" },
+      "12months",
+    ),
+  ).toBe(true);
 });

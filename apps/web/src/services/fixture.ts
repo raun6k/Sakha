@@ -5,6 +5,7 @@ import {
   responseExamples,
 } from "@sakha/contracts/examples";
 import { ServiceError } from "./http";
+import { supportsRequestedInterval } from "./series";
 
 const roleCopy: Record<
   c.RoleKey,
@@ -294,7 +295,7 @@ export function createFixtureService(
           : index === 1
             ? "Historical rainfall"
             : "Rainfall outlook",
-      unit: index === 0 ? "°C" : "mm",
+      unit: index === 0 ? "°C" : "mm/day",
       kind: index === 2 ? "forecast" : "observed",
       geography: "Synthetic example geography",
       resolution:
@@ -315,6 +316,34 @@ export function createFixtureService(
               : [2, 5, 0, 8, 0, 12, 4, 7, 3, 1][n],
       })),
       origin: "fixture",
+    }),
+  );
+  series.push(
+    c.Series.parse({
+      id: "fixture-monthly-rainfall",
+      source_id: "W03",
+      snapshot_id: "fixture-monthly-snapshot",
+      evidence_id: "fixture-monthly-evidence",
+      method_version: "synthetic.monthly.v1",
+      variable: "Monthly historical rainfall",
+      unit: "mm/month",
+      kind: "observed",
+      geography: "Synthetic example geography",
+      resolution: "Gridded estimate example",
+      supported_range: {
+        from: "2025-10-01T00:00:00Z",
+        to: "2026-09-01T00:00:00Z",
+      },
+      freshness: {
+        status: "unknown",
+        reason: "Synthetic values, not publication coverage",
+      },
+      completeness: "partial",
+      origin: "fixture",
+      points: Array.from({ length: 12 }, (_, i) => ({
+        time: new Date(Date.UTC(2025, 9 + i, 1)).toISOString(),
+        value: i === 4 ? null : 30 + i * 8,
+      })),
     }),
   );
   const listeners = new Set<(event: c.Event) => void>();
@@ -609,12 +638,18 @@ export function createFixtureService(
         };
       case "getInsights":
         return {
-          series: series.filter(
-            (x) =>
-              !input.series ||
-              x.source_id === input.series ||
-              x.variable === input.series,
-          ),
+          series: series
+            .filter(
+              (x) =>
+                !input.series ||
+                x.source_id === input.series ||
+                x.variable === input.series,
+            )
+            .filter(
+              (x) =>
+                !input.range ||
+                supportsRequestedInterval(x, String(input.range)),
+            ),
           capabilities: [],
           missing_inputs: [],
         };

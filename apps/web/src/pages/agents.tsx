@@ -1003,7 +1003,10 @@ function PreferencesForm({ initial }: { initial: Preferences }) {
           className="button"
           disabled={mutation.isPending}
           onClick={() =>
-            void mutation.mutateAsync(draft).then(() => setSaved(true))
+            void mutation
+              .mutateAsync(draft)
+              .then(() => setSaved(true))
+              .catch(() => {})
           }
         >
           {mutation.isPending ? "Saving…" : "Save preferences"}

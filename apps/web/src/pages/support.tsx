@@ -1,4 +1,4 @@
-import type { Consent, Job, RoleKey, Settings } from "@sakha/contracts";
+import type { Consent, Job, Settings } from "@sakha/contracts";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
@@ -21,6 +21,7 @@ import {
   useService,
 } from "../services/context";
 import { downloadExport } from "../services/http";
+import { supportsRequestedInterval } from "../services/series";
 export function InsightsPage() {
   const farmId = useFarmId();
   const [search, setSearch] = useSearchParams();
@@ -33,6 +34,8 @@ export function InsightsPage() {
     { params: { farmId }, input: { series, range } },
     Boolean(farmId),
   );
+  const visibleSeries =
+    q.data?.series.filter((s) => supportsRequestedInterval(s, range)) ?? [];
   return (
     <div className="route-content">
       <PageHeading
@@ -85,7 +88,9 @@ export function InsightsPage() {
               <option value="60months">
                 Recent five years of monthly totals
               </option>
-              <option value="30days">Daily 30-day view (unavailable)</option>
+              <option value="30days">
+                Daily 30-day view (where published)
+              </option>
             </>
           )}
         </select>
@@ -93,8 +98,8 @@ export function InsightsPage() {
       <ErrorNotice error={q.error} />
       {q.isPending ? (
         <Loading />
-      ) : q.data?.series.length ? (
-        q.data.series.map((s) => (
+      ) : visibleSeries.length ? (
+        visibleSeries.map((s) => (
           <ChartCard key={s.id} series={s} range={range} />
         ))
       ) : (
@@ -246,7 +251,10 @@ function GlobalSettingsForm({ initial }: { initial: Settings }) {
           className="button"
           disabled={mutation.isPending}
           onClick={() =>
-            void mutation.mutateAsync(draft).then(() => setSaved(true))
+            void mutation
+              .mutateAsync(draft)
+              .then(() => setSaved(true))
+              .catch(() => {})
           }
         >
           {mutation.isPending ? "Saving…" : "Save application preferences"}
@@ -303,8 +311,8 @@ function ConsentPanel() {
       </p>
       <p className="chart-meta">
         Standard scope covers farm location, equipment, cultivation, water and
-        reported crop observations for the farming roles. Finance and support
-        details require the separate choices below.
+        reported crop observations for A0 and all eight specialist roles.
+        Finance and support details require the separate choices below.
       </p>
       <Field label="Purpose">
         <input value={purpose} onChange={(e) => setPurpose(e.target.value)} />
@@ -370,13 +378,14 @@ function ConsentPanel() {
                 "crop_care",
                 "water",
                 "market",
-                ...(financial ? ["farm_finance" as RoleKey] : []),
-                ...(support ? ["government_support" as RoleKey] : []),
+                "farm_finance",
+                "government_support",
               ],
               external_processing: external,
               storage: "persistent",
             })
             .then(() => setConfirmed(false))
+            .catch(() => {})
         }
       >
         Grant this scope

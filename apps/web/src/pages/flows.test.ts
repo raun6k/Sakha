@@ -258,3 +258,36 @@ it("preserves published-month windows and seasonal labels in chart context", asy
   await userEvent.setup().click(screen.getByText("Read values as a table"));
   expect(screen.getByRole("cell", { name: "Published October" })).toBeDefined();
 });
+it("allows general specialist conversations without requiring optional private finance or support fields", async () => {
+  const service = createFixtureService();
+  const execute = vi.spyOn(service, "execute");
+  const user = userEvent.setup();
+  mount(h(SettingsPage), service);
+  await user.click(
+    await screen.findByRole("checkbox", { name: /Allow my conversation text/ }),
+  );
+  await user.click(
+    screen.getByRole("checkbox", { name: /I understand this scope/ }),
+  );
+  await user.click(screen.getByRole("button", { name: "Grant this scope" }));
+  await waitFor(() =>
+    expect(execute.mock.calls.some(([name]) => name === "grantConsent")).toBe(
+      true,
+    ),
+  );
+  const request = execute.mock.calls.find(
+    ([name]) => name === "grantConsent",
+  )?.[1];
+  expect(request?.input).toMatchObject({
+    external_processing: true,
+    roles: expect.arrayContaining([
+      "chief_of_staff",
+      "farm_finance",
+      "government_support",
+    ]),
+    fields: expect.arrayContaining(["conversation", "F01", "F03", "F04"]),
+  });
+  expect(request?.input).toMatchObject({
+    fields: expect.not.arrayContaining(["F05", "F08"]),
+  });
+});
