@@ -4,6 +4,7 @@
     "includes": [
       "**",
       "!docs",
+      "!demo/sources",
       "!.local",
       "!**/dist",
       "!**/node_modules",

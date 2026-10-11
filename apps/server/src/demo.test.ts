@@ -21,7 +21,10 @@ it("seeds a coherent demo once without inventing external evidence", () => {
   expect(plan.active_revision?.status).toBe("approved");
   expect(plan.proposed_revisions).toHaveLength(1);
   expect(
-    s.store.list("task", farm.id).map((t) => (t as { status: string }).status),
+    s.store
+      .list("task", farm.id)
+      .map((t) => (t as { status: string }).status)
+      .sort(),
   ).toEqual(["completed", "pending", "pending"]);
   expect(s.store.list("activity", farm.id)).toHaveLength(2);
   expect(actualLedger(s.store, farm.id).water_m3).toBe(0);

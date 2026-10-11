@@ -12,3 +12,5 @@ for (const name of readdirSync("packages")) {
   });
 }
 cpSync("apps/web/dist", "apps/server/dist/apps/web/dist", { recursive: true });
+
+cpSync("demo", "apps/server/dist/demo", { recursive: true });

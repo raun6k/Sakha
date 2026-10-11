@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")/.."
+export SAKHA_DATABASE_PATH="${SAKHA_DATABASE_PATH:-$PWD/.local/demo/sakha.sqlite}"
+export SAKHA_PORT="${SAKHA_PORT:-4396}"
+export SAKHA_CODEX_ENABLED=true
+export SAKHA_CODEX_MODEL=gpt-6-luna
+case "${1:-start}" in
+  init|reset) exec ./scripts/sakha operator demo "$1" ;;
+  refresh) exec ./scripts/sakha operator refresh "${2:?Supply demo farm ID}" "${3:-30}" "${4:-7}" ;;
+  start) exec ./scripts/sakha start ;;
+  *) echo "Usage: scripts/sakha-demo init|reset|start|refresh FARM_ID" >&2; exit 1 ;;
+esac

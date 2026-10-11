@@ -5,6 +5,7 @@ import { importMarketQuote, refreshCoreEvidence } from "@sakha/data";
 import envPaths from "env-paths";
 import { createApp } from "./app.js";
 import { initializeDemo, resetDemo } from "./demo.js";
+import { importDemoSources } from "./demo-sources.js";
 import { lockDatabase } from "./process-lock.js";
 
 const paths = envPaths("sakha", { suffix: "" });
@@ -30,8 +31,14 @@ try {
       );
     const profile =
       farmId === "reset" ? resetDemo(services) : initializeDemo(services);
+    const sources = importDemoSources(services, profile.id);
     console.log(
-      JSON.stringify({ farm_id: profile.id, name: profile.name, demo: true }),
+      JSON.stringify({
+        farm_id: profile.id,
+        name: profile.name,
+        demo: true,
+        sources,
+      }),
     );
   } else if (command === "farms") {
     console.log(
