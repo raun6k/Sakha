@@ -460,10 +460,16 @@ export function createApp(options: {
     app.register(fastifyStatic, {
       root: options.webDirectory,
       prefix: "/",
-      wildcard: false,
+      wildcard: true,
     });
     app.setNotFoundHandler(async (request, reply) => {
-      if (request.method === "GET" && !request.url.startsWith("/api/"))
+      const pathname = request.url.split("?")[0] ?? "/";
+      if (
+        request.method === "GET" &&
+        !pathname.startsWith("/api/") &&
+        !pathname.startsWith("/assets/") &&
+        !/\.[^/]+$/.test(pathname)
+      )
         return reply.type("text/html").sendFile("index.html");
       return reply
         .code(404)
@@ -471,7 +477,10 @@ export function createApp(options: {
     });
   }
   app.addHook("onSend", async (request, reply, payload) => {
-    if (request.url.startsWith("/api/"))
+    if (
+      request.url.startsWith("/api/") ||
+      String(reply.getHeader("content-type")).startsWith("text/html")
+    )
       reply.header("cache-control", "no-store");
     return payload;
   });

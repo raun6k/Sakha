@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as c from "@sakha/contracts";
@@ -74,4 +74,58 @@ it("expires old stream cursors without deleting authoritative farm records", asy
   expect(replayEvents(s.store, farm.id, old)[0]?.type).toBe("resync_required");
   expect(s.farm.assertFarm(farm.id).name).toBe("Retention fixture");
   await s.app.close();
+});
+
+it("serves rebuilt assets without restarting and never returns HTML for missing scripts", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "sakha-web-"));
+  mkdirSync(join(directory, "assets"));
+  writeFileSync(
+    join(directory, "index.html"),
+    '<script src="/assets/first.js"></script>',
+  );
+  writeFileSync(
+    join(directory, "assets/first.js"),
+    "export const version = 1;",
+  );
+  const services = createApp({
+    databasePath: ":memory:",
+    webDirectory: directory,
+  });
+  try {
+    await services.app.ready();
+    // Vite replaces hashed filenames during a rebuild while the server stays up.
+    writeFileSync(
+      join(directory, "assets/rebuilt.js"),
+      "export const version = 2;",
+    );
+    writeFileSync(
+      join(directory, "index.html"),
+      '<script src="/assets/rebuilt.js"></script>',
+    );
+    const script = await services.app.inject({
+      method: "GET",
+      url: "/assets/rebuilt.js",
+    });
+    expect(script.statusCode).toBe(200);
+    expect(script.headers["content-type"]).toContain("javascript");
+    expect(script.body).toBe("export const version = 2;");
+    const missing = await services.app.inject({
+      method: "GET",
+      url: "/assets/missing.js",
+    });
+    expect(missing.statusCode).toBe(404);
+    expect(missing.headers["content-type"]).not.toContain("text/html");
+    const route = await services.app.inject({
+      method: "GET",
+      url: "/ask?presentation=1",
+    });
+    expect(route.statusCode).toBe(200);
+    expect(route.body).toContain("/assets/rebuilt.js");
+    expect(route.headers["cache-control"]).toBe("no-store");
+    const shell = await services.app.inject({ method: "GET", url: "/" });
+    expect(shell.headers["cache-control"]).toBe("no-store");
+  } finally {
+    await services.app.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
