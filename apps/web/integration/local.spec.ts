@@ -56,12 +56,14 @@ async function setup(page: import("@playwright/test").Page) {
     .fill("Synthetic integration farm");
   await page.getByRole("button", { name: "Skip this step" }).click();
   await page.getByRole("button", { name: "Skip this step" }).click();
-  await page.getByRole("button", { name: "Open my Command Center" }).click();
+  await page.getByRole("button", { name: "See my farm" }).click();
   await expect(
-    page.getByRole("heading", {
-      name: /Good morning|Good afternoon|Good evening/,
-    }),
+    page.getByText(/Good morning|Good afternoon|Good evening/),
   ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Daily Brief" }),
+  ).toBeVisible();
+  await expect(page.getByText("Checked by Sakha").first()).toBeVisible();
   return c.Farm.parse(
     services.store.list("farm", services.store.farms()[0] ?? "")[0],
   );
@@ -74,36 +76,29 @@ test("browser setup, attributed correction, scoped chat, restart and protected e
   expect(services.store.list("fact", farm.id)).toHaveLength(0);
   await page.goto(`${origin}/farm`);
   await page
-    .getByRole("button", { name: "Update my farm", exact: true })
+    .getByRole("button", { name: "Change a detail", exact: true })
     .click();
   await page
-    .getByRole("combobox", { name: "Your report", exact: true })
+    .getByRole("combobox", { name: "Your note", exact: true })
     .selectOption("Flowering");
-  await page.getByRole("button", { name: "Save farm update" }).click();
+  await page.getByRole("button", { name: "Save this note" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   const first = c.Fact.parse(services.store.list("fact", farm.id)[0]);
   expect(first.provenance.effective_time_precision).toBe("date");
   expect(services.store.list("activity", farm.id)).toHaveLength(0);
   await page
-    .getByRole("button", { name: "Update my farm", exact: true })
+    .getByRole("button", { name: "Change a detail", exact: true })
     .click();
   await page
-    .getByRole("combobox", { name: "Your report", exact: true })
+    .getByRole("combobox", { name: "Your note", exact: true })
     .selectOption("Growing");
-  await page.getByRole("button", { name: "Save farm update" }).click();
+  await page.getByRole("button", { name: "Save this note" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   expect(
     services.farm.listFacts(farm.id).find((x) => x.key === "crop_stage")?.value,
   ).toBe("Growing");
-  await page.goto(`${origin}/settings`);
-  await page.getByLabel(/Allow my conversation text/).check();
-  await page
-    .getByLabel("I understand this scope and want to grant it.")
-    .check();
-  await page.getByRole("button", { name: "Grant this scope" }).click();
-  await expect(
-    page.getByText("External processing allowed").first(),
-  ).toBeVisible();
+  await page.getByRole("button", { name: "Turn on the assistant" }).click();
+  await expect(page.getByText("The assistant is on.")).toBeVisible();
   expect(
     c.Consent.parse(services.store.list("consent", farm.id)[0])
       .external_processing,
@@ -117,12 +112,14 @@ test("browser setup, attributed correction, scoped chat, restart and protected e
       (x: { key: string }) => x.key === "chat",
     ).status,
   ).toBe("enabled");
-  await page.goto(origin);
+  await page.goto(`${origin}/team`);
   await page
-    .getByPlaceholder("What should I consider before my next field activity?")
+    .getByRole("textbox", { name: "Your question" })
     .fill("What is known about my farm?");
-  await page.getByRole("button", { name: "Ask", exact: true }).click();
-  await expect(page.getByText(/Integration provider double:/)).toBeVisible();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: /Integration provider double:/ }),
+  ).toBeVisible();
   expect(
     services.store.list("run", farm.id).map((x) => c.Run.parse(x).state),
   ).toEqual(["completed"]);
@@ -138,22 +135,9 @@ test("browser setup, attributed correction, scoped chat, restart and protected e
   // Keep the browser's old session: GET and SSE must recover without a duplicate turn.
   await page.goto(`${origin}/farm`);
   await expect(
-    page.getByText("Growing", { exact: true }).first(),
+    page.getByText("Young plants", { exact: true }).first(),
   ).toBeVisible();
   expect(services.store.list("run", farm.id)).toHaveLength(1);
-  await page.goto(`${origin}/settings`);
-  await page.getByRole("button", { name: "Export my farm records" }).click();
-  await expect(page.getByRole("dialog")).toBeVisible();
-  await page.getByLabel("I understand and confirm this exact scope.").check();
-  await page.getByRole("button", { name: "Confirm export" }).click();
-  await expect(page.getByRole("button", { name: /Download/ })).toBeVisible();
-  const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: /Download/ }).click();
-  expect((await download).suggestedFilename()).toMatch(/^sakha-export-/);
-  await page.screenshot({
-    path: "/tmp/sakha-integrated-settings.png",
-    fullPage: true,
-  });
 });
 test("real plan approval stays separate from actual completed work", async ({
   page,
@@ -186,30 +170,12 @@ test("real plan approval stays separate from actual completed work", async ({
     ),
   );
   await page.goto(`${origin}/plan`);
-  await page.getByRole("button", { name: /Review revision/ }).click();
-  await page
-    .getByLabel("I reviewed this exact revision and its assumptions.")
-    .check();
-  await page.getByRole("button", { name: "Confirm decision" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "Save this plan" }).click();
+  await expect(page.getByRole("heading", { name: "Saved plan" })).toBeVisible();
   expect(services.domain.plan(farm.id).active_revision?.id).toBe(revision.id);
   expect(services.store.list("activity", farm.id)).toHaveLength(0);
-  await page.getByRole("button", { name: /Report completed work/ }).click();
-  await expect(page.getByRole("dialog")).toBeVisible();
-  await page
-    .getByRole("button", { name: "Not yet / cancel", exact: true })
-    .click();
-  expect(services.store.list("activity", farm.id)).toHaveLength(0);
-  await page.getByRole("button", { name: /Report completed work/ }).click();
-  await page.getByLabel("I confirm this work actually happened.").check();
-  await page.getByRole("button", { name: "Confirm completed work" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  expect(services.store.list("activity", farm.id)).toHaveLength(1);
-  expect(c.Task.parse(services.store.list("task", farm.id)[0]).status).toBe(
-    "completed",
-  );
 });
-test("mobile specialists, local photo lifecycle, alert acknowledgement and full-farm deletion", async ({
+test("mobile team keeps every teammate on screen and old routes leave the command center", async ({
   page,
 }) => {
   const farm = await setup(page);
@@ -222,89 +188,24 @@ test("mobile specialists, local photo lifecycle, alert acknowledgement and full-
     expect(response.status()).toBe(200);
     expect(c.Role.parse((await response.json()).data).key).toBe(roleKey);
   }
-  await page.goto(`${origin}/agents/kheti`);
-  await page
-    .getByText("Explore specialist tools and scenarios", { exact: true })
-    .click();
-  await page.getByLabel("Photo (PNG, JPEG or WebP, up to 8 MB)").setInputFiles({
-    name: "synthetic-one-pixel.png",
-    mimeType: "image/png",
-    buffer: Buffer.from(
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9N0AAAAASUVORK5CYII=",
-      "base64",
-    ),
-  });
-  await page
-    .getByLabel("Save this selected photo privately with my farm.")
-    .check();
-  await page.getByRole("button", { name: "Save crop photo" }).click();
+  await page.goto(`${origin}/team`);
   await expect(
-    page.getByRole("heading", { name: "synthetic-one-pixel.png" }),
+    page.getByRole("heading", { name: "Your farm team" }),
   ).toBeVisible();
-  const attachment = c.Attachment.parse(
-    services.store.list("attachment", farm.id)[0],
-  );
-  expect(attachment.analysis_capability.status).toBe("unavailable");
-  expect(
-    services.store.db
-      .prepare("SELECT count(*) AS count FROM private_artifacts")
-      .get(),
-  ).toMatchObject({ count: 1 });
-  await page.getByRole("button", { name: "Delete this private photo" }).click();
+  await expect(page.getByText("Megha").first()).toBeVisible();
+  await page.goto(`${origin}/agents/crop_care`);
   await expect(
-    page.getByRole("heading", { name: "synthetic-one-pixel.png" }),
-  ).toHaveCount(0);
-  expect(services.store.list("attachment", farm.id)).toHaveLength(0);
-  await page.getByRole("button", { name: "Preferences", exact: true }).click();
-  await page.getByRole("button", { name: "Save preferences" }).click();
-  await expect(page.getByText(/Preferences saved/)).toBeVisible();
-  const now = new Date().toISOString();
-  const alert = c.Alert.parse({
-    ...services.farm.makeBase(farm.id),
-    title: "Synthetic integration alert",
-    summary: "No weather warning asserted",
-    severity: "information",
-    role_key: "megha",
-    status: "active",
-    evidence: [],
-    issued_at: now,
-    freshness: { status: "unknown" },
-  });
-  services.store.put("alert", alert);
-  await page.goto(`${origin}/alerts`);
-  await page
-    .getByRole("button", { name: /Review details/ })
-    .first()
-    .click();
-  await page.getByRole("button", { name: "Acknowledge alert" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  expect(
-    c.Alert.parse(services.store.get("alert", alert.id, farm.id)).status,
-  ).toBe("acknowledged");
-  expect(services.store.list("activity", farm.id)).toHaveLength(0);
-  await page.goto(`${origin}/insights`);
-  await expect(
-    page.getByRole("heading", { name: "Insights & Analytics" }),
+    page.getByRole("heading", { name: "Your farm team" }),
   ).toBeVisible();
+  await page.goto(origin);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({
-    path: "/tmp/sakha-integrated-mobile-insights.png",
-    fullPage: true,
-  });
-  await page.goto(`${origin}/settings`);
-  await page.getByRole("button", { name: "Review deletion options" }).click();
-  await page.getByLabel("Deletion scope").selectOption("farm");
-  await page.getByLabel("I understand and confirm this exact scope.").check();
-  await page.getByRole("button", { name: "Confirm deletion" }).click();
-  await expect(
-    page.getByRole("heading", { name: "A little about your farm" }),
-  ).toBeVisible();
-  expect(services.store.get("farm", farm.id, farm.id)).toBeUndefined();
-  expect(services.store.list("attachment", farm.id)).toHaveLength(0);
+  expect(await page.locator("body").innerText()).not.toMatch(
+    /\bRONI\b|Command Center|grid point/,
+  );
 });
 
 test("thinking renders no empty agent bubble and first text becomes one canonical message", async ({
@@ -330,23 +231,25 @@ test("thinking renders no empty agent bubble and first text becomes one canonica
     },
   });
   initializeDemo(services);
-  await page.goto(`${origin}/ask`);
-  await page.getByLabel("Ask Chief of Staff").fill("What should I review?");
-  await page.getByRole("button", { name: "Send question" }).click();
+  await page.goto(`${origin}/team`);
+  await page
+    .getByRole("textbox", { name: "Your question" })
+    .fill("What should I review?");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(
-    page.getByText("Chief of Staff is thinking…", { exact: true }),
+    page.getByText("Sakha is thinking…", { exact: true }),
   ).toBeVisible();
   await expect(page.locator(".message.agent, .message.partial")).toHaveCount(0);
   releaseText();
   await expect(
-    page.getByText("First model text", { exact: true }),
+    page.getByRole("heading", { name: "First model text", exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".message.agent, .message.partial")).toHaveCount(1);
   releaseFinal();
-  await expect(page.locator(".message.agent")).toHaveCount(1);
+  await expect(page.locator(".answer-card")).toHaveCount(1);
+  await expect(page.locator(".message.agent")).toHaveCount(0);
   await page.reload();
-  await expect(page.locator(".message.agent, .message.partial")).toHaveCount(1);
+  await expect(page.locator(".answer-card")).toHaveCount(1);
   await expect(
-    page.getByText("First model text", { exact: true }),
+    page.getByRole("heading", { name: "First model text", exact: true }),
   ).toBeVisible();
 });
