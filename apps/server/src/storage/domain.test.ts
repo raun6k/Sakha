@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type * as c from "@sakha/contracts";
+import * as c from "@sakha/contracts";
 import {
   actualLedger,
   convertQuantity,
@@ -327,5 +327,33 @@ it("inherits critical finding constraints and blocks unverified water tasks", ()
       { farmId: id, revisionId: revision.id },
     ),
   ).toThrow("Critical missing");
+  store.close();
+});
+
+it("keeps monsoon and reported-damage scenarios bounded when measurements and local methods are missing", () => {
+  const { domain, store, id } = context();
+  for (const kind of ["seasonal_risk", "crop_care", "planting_plan"]) {
+    const result = c.Scenario.parse(
+      domain.execute(
+        "createScenario",
+        {
+          farm_id: id,
+          role_key: kind === "crop_care" ? "crop_care" : "crop_planning",
+          kind,
+          inputs: {
+            condition: "Farmer reports dry spell or crop damage",
+            water_availability: { kind: "qualitative", text: "some water" },
+          },
+          evidence: [],
+          assumptions: [],
+        },
+        { farmId: id },
+      ),
+    );
+    expect(result.status).toBe("needs_information");
+    expect(result.missing_inputs.length).toBeGreaterThan(0);
+    expect(result.results.yield).toBeUndefined();
+    expect(result.results.water_demand).toBeUndefined();
+  }
   store.close();
 });

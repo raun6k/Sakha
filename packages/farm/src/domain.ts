@@ -111,8 +111,37 @@ export function createDomainServices(
               );
             if (request.field_id)
               load(store, "field", request.field_id, farmId, c.Field);
-            for (const ref of request.evidence)
-              load(store, "evidence", ref.evidence_id, farmId, c.Evidence);
+            for (const ref of request.evidence) {
+              const record = load(
+                store,
+                "evidence",
+                ref.evidence_id,
+                farmId,
+                c.Evidence,
+              );
+              if (
+                record.snapshot_id !== ref.snapshot_id ||
+                record.source_id !== ref.source_id
+              )
+                throw new DomainError(
+                  "validation",
+                  "Evidence identity does not match its immutable snapshot",
+                );
+              if (record.field_id && record.field_id !== request.field_id)
+                throw new DomainError(
+                  "scope_denied",
+                  "Scenario evidence belongs to another field",
+                );
+              if (
+                record.valid_until &&
+                record.valid_until < now() &&
+                ["forecast", "guidance"].includes(record.kind)
+              )
+                throw new DomainError(
+                  "source_stale",
+                  "Current scenario cannot rely on expired evidence",
+                );
+            }
             const missing: string[] = [];
             const results: Record<string, c.Quantity | cMoney | string> = {};
             for (const [key, value] of Object.entries(request.inputs)) {
@@ -419,9 +448,11 @@ export function createDomainServices(
                     ? "supplied-kg-price-proceeds.v1"
                     : request.kind === "sale_storage"
                       ? "supplied-sale-storage-hypothesis.v1"
-                      : results.total_cost
-                        ? "supplied-cost-sum.v1"
-                        : "supplied-money-margin.v1"
+                      : results.source_guidance
+                        ? "attributed-guidance-context.v1"
+                        : results.total_cost
+                          ? "supplied-cost-sum.v1"
+                          : "supplied-money-margin.v1"
                 : "domain-method-unavailable.v1",
               origin: "derived_calculation",
             });
