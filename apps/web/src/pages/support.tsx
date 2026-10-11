@@ -24,6 +24,7 @@ import { downloadExport } from "../services/http";
 import { supportsRequestedInterval } from "../services/series";
 export function InsightsPage() {
   const farmId = useFarmId();
+  const bootstrap = useRead("bootstrap", { input: {} });
   const [search, setSearch] = useSearchParams();
   const series = search.get("series") ?? "W03";
   const range =
@@ -85,12 +86,16 @@ export function InsightsPage() {
           ) : (
             <>
               <option value="12months">Recent 12 published months</option>
-              <option value="60months">
-                Recent five years of monthly totals
-              </option>
-              <option value="30days">
-                Daily 30-day view (where published)
-              </option>
+              {!bootstrap.data?.demo_profile ? (
+                <>
+                  <option value="60months">
+                    Recent five years of monthly totals
+                  </option>
+                  <option value="30days">
+                    Daily 30-day view (where published)
+                  </option>
+                </>
+              ) : null}
             </>
           )}
         </select>
@@ -134,13 +139,6 @@ export function InsightsPage() {
           regional conditions and does not guarantee rainfall on this farm.
           Missing points remain gaps.
         </p>
-      </Card>
-      <Card title="Regional drought context">
-        <State title="Coverage not established">
-          Regional drought processing is shown only when a supported source and
-          method are available. No crop stress or soil moisture is inferred from
-          missing data.
-        </State>
       </Card>
     </div>
   );

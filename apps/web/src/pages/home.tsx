@@ -1,8 +1,8 @@
-import type { Alert, RoleKey } from "@sakha/contracts";
+import type { Alert, Finding, RoleKey } from "@sakha/contracts";
 import { ArrowRight, Send } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { AlertDetails, ChartCard } from "../components/evidence";
+import { AlertDetails, ChartCard, EvidenceLinks } from "../components/evidence";
 import {
   Card,
   ErrorNotice,
@@ -47,11 +47,17 @@ export function HomePage() {
     title: string;
     value: string;
     description: string;
+    evidence?: Finding["evidence"];
   }[] = [
     {
       role: "weather",
+      evidence: home.sections.weather[0]?.evidence,
       title: "Weather",
-      value: home.sections.weather[0]?.title ?? "Information unavailable",
+      value: home.sections.weather[0]?.evidence.some(
+        (e) => e.source_id === "W01",
+      )
+        ? `${home.farm.location?.district ?? "Local"} district forecast`
+        : (home.sections.weather[0]?.title ?? "Information unavailable"),
       description:
         home.sections.weather[0]?.summary ??
         "A supported local forecast is needed.",
@@ -70,6 +76,7 @@ export function HomePage() {
     },
     {
       role: "climate",
+      evidence: home.sections.climate[0]?.evidence,
       title: "El Niño outlook",
       value: home.sections.climate[0]?.title ?? "Information unavailable",
       description:
@@ -149,6 +156,9 @@ export function HomePage() {
               </div>
               <p className="stat-value">{o.value}</p>
               <p className="overview-summary">{o.description}</p>
+              {o.evidence?.length ? (
+                <EvidenceLinks evidence={o.evidence} />
+              ) : null}
               <Link className="text-link" to={`/agents/${o.role}?tab=chat`}>
                 View specialist <ArrowRight size={15} />
               </Link>

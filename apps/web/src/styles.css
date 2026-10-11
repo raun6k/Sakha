@@ -1022,7 +1022,8 @@ main {
     justify-content: space-around;
     box-shadow: 0 -3px 15px #183b2120;
   }
-  .mobile-nav a {
+  .mobile-nav a,
+  .mobile-nav button {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1104,7 +1105,8 @@ main {
   .grid-4 {
     grid-template-columns: 1fr;
   }
-  .mobile-nav a {
+  .mobile-nav a,
+  .mobile-nav button {
     padding-inline: 7px;
   }
 }

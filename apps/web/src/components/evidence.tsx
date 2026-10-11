@@ -261,7 +261,7 @@ export function ChartCard({
     .join(" ");
   return (
     <Card
-      title={series.variable}
+      title={series.variable.replaceAll("_", " ")}
       className="chart-card"
       action={
         <Badge tone={series.origin === "fixture" ? "gold" : "neutral"}>

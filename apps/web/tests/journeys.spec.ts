@@ -4,7 +4,9 @@ const evidence = "/tmp/sakha-frontend-evidence";
 async function demo(page: import("@playwright/test").Page) {
   await page.goto("/?demo=1");
   await expect(
-    page.getByRole("heading", { name: /Welcome back/ }),
+    page.getByRole("heading", {
+      name: /Good morning|Good afternoon|Good evening/,
+    }),
   ).toBeVisible();
 }
 test("J01 skipped setup creates a profile with unknown facts", async ({
@@ -18,7 +20,9 @@ test("J01 skipped setup creates a profile with unknown facts", async ({
   await page.getByRole("button", { name: "Skip this step" }).click();
   await page.getByRole("button", { name: "Open my Command Center" }).click();
   await expect(
-    page.getByRole("heading", { name: /Welcome back/ }),
+    page.getByRole("heading", {
+      name: /Good morning|Good afternoon|Good evening/,
+    }),
   ).toBeVisible();
   await expect(
     page.getByText("Not recorded", { exact: true }).first(),
@@ -48,7 +52,11 @@ test("J04 each specialist has About Chat Preferences History", async ({
   page,
 }) => {
   await demo(page);
-  await page.getByRole("link", { name: "Agents", exact: true }).first().click();
+  await page
+    .getByRole("button", { name: "Agents", exact: true })
+    .first()
+    .click();
+  await page.getByRole("link", { name: "View agent directory" }).click();
   await expect(
     page.getByRole("heading", { name: "Your farming specialists" }),
   ).toBeVisible();
@@ -198,7 +206,12 @@ test("J09 mobile supporting menu keyboard and history reachability", async ({
     page
       .getByRole("navigation", { name: "Mobile primary navigation" })
       .getByRole("link"),
-  ).toHaveCount(4);
+  ).toHaveCount(3);
+  await expect(
+    page
+      .getByRole("navigation", { name: "Mobile primary navigation" })
+      .getByRole("button", { name: "Agents" }),
+  ).toHaveCount(1);
   await page.screenshot({
     path: `${evidence}/activity-mobile.png`,
     fullPage: true,
