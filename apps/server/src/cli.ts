@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { importMarketQuote, refreshCoreEvidence } from "@sakha/data";
 import envPaths from "env-paths";
 import { createApp } from "./app.js";
+import { initializeDemo, resetDemo } from "./demo.js";
 import { lockDatabase } from "./process-lock.js";
 
 const paths = envPaths("sakha", { suffix: "" });
@@ -22,7 +23,17 @@ try {
 const { app, store, farm, dataServices } = services;
 const [command, farmId, arg, extra] = process.argv.slice(2);
 try {
-  if (command === "farms") {
+  if (command === "demo" && ["init", "reset"].includes(farmId ?? "")) {
+    if (!process.env.SAKHA_DATABASE_PATH?.trim())
+      throw new Error(
+        "Set SAKHA_DATABASE_PATH to a dedicated demo database before initializing or resetting demo records",
+      );
+    const profile =
+      farmId === "reset" ? resetDemo(services) : initializeDemo(services);
+    console.log(
+      JSON.stringify({ farm_id: profile.id, name: profile.name, demo: true }),
+    );
+  } else if (command === "farms") {
     console.log(
       JSON.stringify(
         store.db
@@ -97,7 +108,7 @@ try {
     );
   } else
     throw new Error(
-      "Usage: pnpm operator farms | refresh FARM_ID [HISTORICAL_DAYS=30] [FORECAST_DAYS=7] | import FARM_ID CURATED_JSON RAW_PDF | market-import FARM_ID QUOTE_JSON RAW_SOURCE",
+      "Usage: pnpm operator demo init|reset (explicit SAKHA_DATABASE_PATH) | farms | refresh FARM_ID [HISTORICAL_DAYS=30] [FORECAST_DAYS=7] | import FARM_ID CURATED_JSON RAW_PDF | market-import FARM_ID QUOTE_JSON RAW_SOURCE",
     );
 } finally {
   try {

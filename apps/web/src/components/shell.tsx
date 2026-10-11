@@ -157,13 +157,16 @@ export function Shell() {
             <Bell size={20} />
           </Link>
         </div>
-        {demo ? (
+        {demo || bootstrap.data?.demo_profile ? (
           <div className="demo-banner" role="status">
-            Demonstration mode · synthetic records and events · no live advice
-            or monitoring
-            <Link to="/?mode=live" reloadDocument>
-              Open real local profile
-            </Link>
+            {demo
+              ? "UI fixtures · synthetic sources and events"
+              : "Demo farm · illustrative farmer records · attributed official sources"}
+            {demo ? (
+              <Link to="/?mode=live" reloadDocument>
+                Open local backend
+              </Link>
+            ) : null}
           </div>
         ) : null}
         <Modal

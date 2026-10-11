@@ -13,6 +13,7 @@ import {
 } from "@sakha/farm";
 import Fastify from "fastify";
 import { z } from "zod";
+import { isDemo } from "./demo.js";
 import { replayEvents } from "./events.js";
 import { createExecution } from "./execution.js";
 import { createLifecycle } from "./lifecycle.js";
@@ -243,6 +244,7 @@ export function createApp(options: {
           if (name === "health") return { status: "ok" };
           if (name === "bootstrap")
             return c.Bootstrap.parse({
+              demo_profile: isDemo(store),
               schema_version: c.CONTRACT_VERSION,
               session_token: sessionToken,
               readiness: (

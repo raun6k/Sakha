@@ -479,6 +479,7 @@ export const Home = z.object({
   capabilities: z.array(Capability),
 });
 export const Bootstrap = z.object({
+  demo_profile: z.boolean().default(false),
   schema_version: z.literal(CONTRACT_VERSION),
   session_token: z.string().min(1),
   readiness: z.enum(["ready", "setup_required", "unavailable"]),
