@@ -756,6 +756,11 @@ export function createExecution(
           }
         }
         let text = ensureCited(result.text, scratch.citations);
+        const card = scratch.cards.length
+          ? mergeCards(scratch.cards)
+          : sakhaReview(
+              cardFromSources(run.role_key, text, scratch.citations, now()),
+            ).card;
         const names = scratch.specialists.map(
           (id) => specialistLabels[id as keyof typeof specialistLabels] ?? id,
         );
@@ -764,11 +769,6 @@ export function createExecution(
             ? `Reviewed by Sakha${names.length ? ` · consulted ${names.join(", ")}` : ""}`
             : "Checked by Sakha";
         if (!text.includes(chip)) text = `${text.trim()}\n\n${chip}`;
-        const card = scratch.cards.length
-          ? mergeCards(scratch.cards)
-          : sakhaReview(
-              cardFromSources(run.role_key, text, scratch.citations, now()),
-            ).card;
         message = {
           ...message,
           text,
