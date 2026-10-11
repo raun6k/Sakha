@@ -172,7 +172,10 @@ export function createExecution(
       }
     }
   }
-  function tools(run: c.Run): RuntimeTurn["tools"] {
+  function tools(
+    run: c.Run,
+    onEvidence?: (items: c.Evidence[]) => void,
+  ): RuntimeTurn["tools"] {
     return {
       readFacts: async () => {
         check(run, "read");
@@ -212,7 +215,9 @@ export function createExecution(
       lookupEvidence: async (query) => {
         check(run, "read");
         authorizeSend(run);
-        return evidence(run, query);
+        const items = evidence(run, query);
+        onEvidence?.(items);
+        return items;
       },
       scenario: async (input) => {
         check(run, "propose");
@@ -393,7 +398,26 @@ export function createExecution(
         facts,
         instructions: `${roleDirectory().find((x) => x.key === run.role_key)?.description}. Use only scoped Sakha tools. Look up actual evidence before claims. Source dates, crop stage, local applicability and missing measurements matter. Do not invent coefficients, eligibility, volumes, prices or percentages. Calculations use calculate_scenario. Only Chief of Staff proposes integrated plans. Never approve plans, save farmer facts or record actual work. Ask one concrete clarification if blocked. A peer request acknowledges queueing, not an answer.`,
         signal: controller.signal,
-        tools: tools(run),
+        tools: tools(run, (items) => {
+          if (!message) return;
+          const consulted = new Map(
+            message.context.evidence.map((ref) => [ref.evidence_id, ref]),
+          );
+          for (const item of items)
+            consulted.set(item.id, {
+              evidence_id: item.id,
+              source_id: item.source_id,
+              snapshot_id: item.snapshot_id,
+              method_version: item.method_version,
+            });
+          message = {
+            ...message,
+            context: { ...message.context, evidence: [...consulted.values()] },
+            version: message.version + 1,
+            updated_at: now(),
+          };
+          store.put("message", message);
+        }),
         beforeSend: async () => {
           const fresh = authorizeSend(run);
           if (

@@ -213,3 +213,44 @@ it("bounds busy-peer retries before delivery and records failed inbox outcome", 
   expect(s.store.list("conversation", s.farmId)).toHaveLength(2);
   await s.app.close();
 });
+it("persists exact consulted evidence snapshots once in the canonical response", async () => {
+  const s = setup({
+    getCapabilities: async () => ready,
+    startTurn: async (turn) => {
+      await turn.tools.lookupEvidence({ source_id: "C01" });
+      await turn.tools.lookupEvidence({ source_id: "C01" });
+      return { text: "Synthetic evidence-grounded answer" };
+    },
+  });
+  grant(s);
+  const item = c.Evidence.parse({
+    ...s.farm.makeBase(s.farmId),
+    source_id: "C01",
+    snapshot_id: "immutable-test-snapshot",
+    title: "Synthetic RONI evidence",
+    text: "Synthetic test only",
+    retrieved_at: new Date().toISOString(),
+    geography: "Tropical Pacific",
+    kind: "observation",
+    origin: "fixture",
+    hash: "synthetic-hash",
+    method_version: "test.v1",
+    citation: {},
+  });
+  s.store.put("evidence", item);
+  await s.execution.tick();
+  const response = s.store
+    .list("message", s.farmId)
+    .map((x) => c.Message.parse(x))
+    .find((x) => x.author === "agent");
+  expect(response?.context.evidence).toEqual([
+    {
+      evidence_id: item.id,
+      source_id: item.source_id,
+      snapshot_id: item.snapshot_id,
+      method_version: item.method_version,
+    },
+  ]);
+  expect(response?.status).toBe("final");
+  await s.app.close();
+});
