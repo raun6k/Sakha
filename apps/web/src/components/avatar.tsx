@@ -1,7 +1,15 @@
 import type { TeamId } from "../team/adapter";
 
+const colors: Record<TeamId, string> = {
+  sakha: "#1F6F43",
+  megha: "#2B7BB9",
+  jal: "#5BA8D6",
+  kheti: "#8B5E3C",
+  paisa: "#F2A93B",
+};
+
 export function Avatar({ id, color }: { id: TeamId; color?: string }) {
-  const ink = color ?? "#1F6F43";
+  const ink = color ?? colors[id];
   return (
     <svg
       className="avatar"

@@ -77,7 +77,6 @@ export function HomePage() {
         : t(lang, "watch");
   return (
     <div className="route-content">
-      <DailyBrief team={team} />
       <section className={`hero hero-${risk.level}`}>
         <FieldArt mood={risk.level} />
         <div className="hero-body">
@@ -94,6 +93,7 @@ export function HomePage() {
           />
         </div>
       </section>
+      <DailyBrief team={team} />
       <Link className="button ask-button" to="/team">
         <span className="ask-icon" aria-hidden="true">
           <Mic size={26} />

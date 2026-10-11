@@ -100,7 +100,6 @@ export function TeamPage() {
         </button>
       </header>
       <HowTeamWorks open={how} onClose={() => setHow(false)} />
-      <Thread role={role.data} mate="sakha" embedded />
       <div className="teammate-grid">
         {team.map((item) => (
           <Link
@@ -119,6 +118,7 @@ export function TeamPage() {
           </Link>
         ))}
       </div>
+      <Thread role={role.data} mate="sakha" embedded />
     </div>
   );
 }

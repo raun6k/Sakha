@@ -552,7 +552,7 @@ main {
 .hero .field-art {
   display: block;
   width: 100%;
-  height: 148px;
+  height: 112px;
 }
 .mood-act .sun circle:last-child {
   transform-origin: 500px 62px;
