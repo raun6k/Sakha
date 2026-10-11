@@ -89,8 +89,12 @@
   --font-body: "Sakha Sans", sans-serif;
   --leading-body: 1.55;
   --leading-heading: 1.2;
+  --leading-label: 1.4;
   --tracking-display: 0.015em;
+  --tracking-eyebrow: 0.08em;
   --text-caption: 16px;
+  --text-money: 2.2rem;
+  --space-card: 22px;
   font-family: var(--font-body);
   font-size: 17px;
   line-height: var(--leading-body);
@@ -264,9 +268,9 @@ a {
 .eyebrow {
   font-size: var(--text-caption);
   font-weight: 650;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
-  line-height: 1.4;
+  line-height: var(--leading-label);
 }
 .brand-mark {
   width: 44px;
@@ -324,10 +328,11 @@ html {
   gap: 4px;
   text-decoration: none;
   color: var(--muted);
-  font-size: 16px;
-  line-height: 1.25;
+  font-size: var(--text-caption);
+  line-height: var(--leading-label);
   letter-spacing: 0;
-  padding: 6px 4px;
+  padding: 6px 2px;
+  text-align: center;
 }
 .tab-bar a[aria-current="page"] {
   background: #e7f4ec;
@@ -357,9 +362,12 @@ html {
 .lang-toggle button {
   background: #eef3ee;
   color: var(--text);
-  font-size: 16px;
-  padding: 8px 12px;
+  font-size: var(--text-caption);
+  padding: 8px 14px;
   letter-spacing: 0;
+  flex: 0 0 auto;
+  width: auto;
+  white-space: nowrap;
 }
 .button.ghost {
   background: transparent;
@@ -432,7 +440,7 @@ html {
 .card,
 .answer-card,
 .state-panel {
-  padding: 22px 22px 24px;
+  padding: var(--space-card) var(--space-card) 24px;
 }
 .card,
 .hero,
@@ -622,8 +630,8 @@ html {
   border-radius: 999px;
   background: #f3eee4;
   font-style: normal;
-  font-size: 16px;
-  line-height: 1.45;
+  font-size: var(--text-caption);
+  line-height: var(--leading-body);
   letter-spacing: 0;
   white-space: normal;
 }
@@ -754,7 +762,7 @@ html {
 .source-badge {
   color: var(--muted);
   font-size: var(--text-caption);
-  line-height: 1.5;
+  line-height: var(--leading-body);
 }
 
 .meter {
@@ -802,7 +810,7 @@ html {
   margin-top: 10px;
   color: var(--muted);
   font-size: var(--text-caption);
-  line-height: 1.4;
+  line-height: var(--leading-label);
   letter-spacing: 0;
 }
 
@@ -916,7 +924,7 @@ html {
   padding: 8px 14px;
   border-radius: 999px;
   background: #f3f0e6;
-  line-height: 1.4;
+  line-height: var(--leading-label);
   letter-spacing: 0;
 }
 .chip.checked {
@@ -1233,6 +1241,13 @@ html {
   }
   .place {
     text-align: left;
+    min-width: 0;
+  }
+  .lang-toggle {
+    flex: none;
+  }
+  .lang-toggle button {
+    padding: 8px 6px;
   }
   .hero .field-art {
     display: none;
@@ -1291,20 +1306,29 @@ html {
 .money-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
   width: 100%;
+}
+.money-row > div {
+  min-width: 0;
+  container-type: inline-size;
 }
 .money-row span {
   display: block;
   color: var(--muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-label);
 }
 .money-row strong {
   display: block;
+  max-width: 100%;
   font-family: var(--font-display);
-  font-size: clamp(1.7rem, 4.4vw, 2.35rem);
+  font-size: 1.35rem;
+  font-size: clamp(1.2rem, 24cqi, var(--text-money));
   font-weight: 620;
-  letter-spacing: var(--tracking-display);
-  line-height: 1.2;
+  letter-spacing: 0;
+  line-height: var(--leading-heading);
+  white-space: nowrap;
   font-variant-numeric: lining-nums tabular-nums;
   font-variation-settings:
     "opsz" 48,
@@ -1396,7 +1420,7 @@ html[lang="hi"] .brand,
 html[lang="mr"] .brand,
 html[lang="hi"] .hero h1,
 html[lang="mr"] .hero h1,
-html[lang="hi"] .money-row strong,
-html[lang="mr"] .money-row strong {
+html[lang="hi"] .mate-head h1,
+html[lang="mr"] .mate-head h1 {
   letter-spacing: 0;
 }
