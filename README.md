@@ -4,7 +4,7 @@ Sakha is a local farming Command Center with one loopback backend, a browser int
 
 ## Run locally
 
-Use Node.js 24 LTS and pnpm 12.10.1. The lockfile records installed dependency versions.
+Use Node.js 24 LTS and pnpm 12.10.1. The lockfile records installed dependency versions. `./scripts/sakha` accepts the same arguments as `pnpm`; on this development machine it uses the tested ignored local toolchain because the default shell has Node 20. It does not change your system installation. On another checkout, install the required Node/pnpm versions first.
 
 ```sh
 pnpm install --frozen-lockfile
