@@ -3,10 +3,10 @@ set -eu
 task_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$task_root"
 # Prefer the tested local toolchain when present; never change the user's shell.
-if [ -x "$task_root/.local/toolchain/bin/node" ] && [ -f "$task_root/.local/toolchain/pnpm/bin/pnpm.cjs" ]; then
+if [ -x "$task_root/.local/toolchain/bin/node" ] && [ -x "$task_root/.local/toolchain/pnpm/pnpm" ]; then
   PATH="$task_root/.local/toolchain/bin:$PATH"
   export PATH
-  exec "$task_root/.local/toolchain/bin/node" "$task_root/.local/toolchain/pnpm/bin/pnpm.cjs" "$@"
+  exec "$task_root/.local/toolchain/pnpm/pnpm" "$@"
 fi
 if ! command -v node >/dev/null 2>&1 || [ "$(node -p 'process.versions.node.split(".")[0]')" != "24" ]; then
   echo 'Sakha requires Node.js 24 LTS. Install Node 24 and pnpm 12.10.1, then retry.' >&2
