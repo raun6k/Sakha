@@ -16,6 +16,7 @@ function turn(onText: (text: string) => Promise<void>): RuntimeTurn {
     tools: {
       readFacts: async () => [],
       lookupEvidence: async () => [],
+      recallMemory: async () => [],
       scenario: async () => c.Scenario.parse(responseExamples.getScenario),
       proposePlan: async () =>
         c.PlanRevision.parse(responseExamples.getPlanRevision),

@@ -17,6 +17,7 @@ function turn(onText: (text: string) => Promise<void>): RuntimeTurn {
     tools: {
       readFacts: async () => [],
       lookupEvidence: async () => [],
+      recallMemory: async () => [],
       scenario: async () => c.Scenario.parse(responseExamples.getScenario),
       proposePlan: async () =>
         c.PlanRevision.parse(responseExamples.getPlanRevision),
@@ -35,7 +36,7 @@ function runtime() {
         process.execPath,
         [
           "-e",
-          `const rl=require('node:readline').createInterface({input:process.stdin});const send=x=>process.stdout.write(JSON.stringify(x)+'\\n');rl.on('line',line=>{const m=JSON.parse(line);if(!m.id)return;if(m.method==='thread/start')send({id:m.id,result:{thread:{id:'thread'}}});else if(m.method==='turn/start'){send({id:m.id,result:{turn:{id:'turn'}}});send({method:'item/agentMessage/delta',params:{threadId:'thread',delta:'Text'}});send({method:'turn/completed',params:{threadId:'thread',turn:{status:'completed'}}});}else send({id:m.id,result:{}});});`,
+          `const rl=require('node:readline').createInterface({input:process.stdin});const send=x=>process.stdout.write(JSON.stringify(x)+'\\n');rl.on('line',line=>{const m=JSON.parse(line);if(!m.id)return;if(m.method==='mcpServerStatus/list')send({id:m.id,result:{data:[{name:'sakha',tools:{read_farm_facts:{}}}],nextCursor:null}});else if(m.method==='thread/start')send({id:m.id,result:{thread:{id:'thread'}}});else if(m.method==='turn/start'){send({id:m.id,result:{turn:{id:'turn'}}});send({method:'item/agentMessage/delta',params:{threadId:'thread',delta:'Text'}});send({method:'turn/completed',params:{threadId:'thread',turn:{status:'completed'}}});}else send({id:m.id,result:{}});});`,
         ],
         { stdio: "pipe" },
       ),

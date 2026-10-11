@@ -266,17 +266,42 @@ class BoundedRangeClient extends BaseClient {
         "Cumulative raster byte budget exceeded",
       );
     this.reserved += requested;
-    const result = await boundedFetch(
-      this.url,
-      Math.min(2_000_000, 8_000_000 - this.bytes),
-      headers,
-      options.signal ?? AbortSignal.timeout(30_000),
-    );
-    if (result.response.status !== 206)
+    const fetchRange = () =>
+      boundedFetch(
+        this.url,
+        Math.min(2_000_000, 8_000_000 - this.bytes),
+        headers,
+        options.signal ?? AbortSignal.timeout(30_000),
+      );
+    let result: Awaited<ReturnType<typeof boundedFetch>>;
+    try {
+      result = await fetchRange();
+    } catch (error) {
+      // One transport retry; publication404 and invalid/malformed data are never retried.
+      if (
+        options.signal?.aborted ||
+        !(
+          error instanceof TypeError ||
+          (error instanceof Error && error.name === "TimeoutError")
+        )
+      ) {
+        this.reserved -= requested;
+        throw error;
+      }
+      try {
+        result = await fetchRange();
+      } catch (failure) {
+        this.reserved -= requested;
+        throw failure;
+      }
+    }
+    if (result.response.status !== 206) {
+      this.reserved -= requested;
       throw new DomainError(
         "unavailable",
-        "Raster server must support byte ranges",
+        `Raster server must support byte ranges (HTTP ${result.response.status})`,
       );
+    }
     this.reserved -= requested;
     const contentRange = result.response.headers
       .get("content-range")
@@ -344,6 +369,9 @@ export async function extractRainfall(
       "validation",
       "CHIRPS grid changed; method validation required",
     );
+  const declaredNoData = image.getGDALNoData();
+  if (declaredNoData !== null && declaredNoData !== -9999)
+    throw new DomainError("validation", "CHIRPS NoData definition changed");
   const cell = containingCell(
     longitude,
     latitude,
@@ -415,6 +443,7 @@ export const DocumentImport = z.object({
   text: z.string().min(1).max(500000),
   geography: z.string().min(1),
   issued_at: c.Timestamp.optional(),
+  source_time_precision: c.Evidence.shape.source_time_precision,
   valid_from: c.Timestamp.optional(),
   valid_until: c.Timestamp.optional(),
   page: z.number().int().positive().optional(),
@@ -516,7 +545,9 @@ export function createDataServices(
       store.put("series_projection", {
         ...base(farmId),
         id: createHash("sha256")
-          .update(`${series.source_id}:${series.variable}:${series.geography}`)
+          .update(
+            `${series.source_id}:${series.variable}:${series.unit}:${series.method_version}:${series.geography}`,
+          )
           .digest("hex"),
         series_id: series.id,
       });
@@ -544,6 +575,11 @@ export function createDataServices(
     assertFarm(farmId);
     const input = DocumentImport.parse(value);
     const original = rawArtifact ?? new TextEncoder().encode(input.text);
+    if (original.length > 25_000_000)
+      throw new DomainError(
+        "validation",
+        "Document artifact exceeds25MB bound",
+      );
     if (createHash("sha256").update(original).digest("hex") !== input.hash)
       throw new DomainError(
         "validation",
@@ -560,7 +596,8 @@ export function createDataServices(
         ...base(farmId),
         content_hash: createHash("sha256").update(input.text).digest("hex"),
         hash_kind: "full_artifact_sha256",
-        source_time_precision: input.issued_at ? "date" : "unknown",
+        source_time_precision:
+          input.source_time_precision ?? (input.issued_at ? "date" : "unknown"),
         source_id: input.source_id,
         snapshot_id: base("public").id,
         title: input.title,
@@ -589,6 +626,13 @@ export function createDataServices(
         method_version: evidence.method_version,
         definition: input.definition,
       });
+      store.put("source_artifact", {
+        ...base("public"),
+        id: input.hash,
+        hash: input.hash,
+        media_type: rawArtifact ? "application/octet-stream" : "text/plain",
+        bytes_base64: Buffer.from(original).toString("base64"),
+      });
       store.put("evidence", evidence);
       store.put("document_applicability", {
         ...base(farmId),
@@ -596,6 +640,76 @@ export function createDataServices(
         crops: input.crops,
         definition: input.definition,
       });
+      const role = input.source_id.startsWith("W")
+        ? "weather"
+        : input.source_id.startsWith("G")
+          ? "government_support"
+          : input.source_id === "A01"
+            ? "crop_planning"
+            : input.source_id.startsWith("A")
+              ? "crop_care"
+              : undefined;
+      if (role) {
+        const finding = c.Finding.parse({
+          ...base(farmId),
+          role_key: role,
+          title: input.title,
+          summary: input.text,
+          evidence: [
+            {
+              evidence_id: evidence.id,
+              source_id: evidence.source_id,
+              snapshot_id: evidence.snapshot_id,
+              label: input.title,
+            },
+          ],
+          assumptions: [input.definition],
+          missing_inputs: [],
+          constraints: [],
+          freshness: {
+            status: input.valid_until
+              ? Date.parse(input.valid_until) < Date.parse(now())
+                ? "stale"
+                : "fresh"
+              : "unknown",
+            retrieved_at: now(),
+            issued_at: input.issued_at,
+            valid_until: input.valid_until,
+            reason: input.valid_until
+              ? undefined
+              : "Historical/public document; current operational applicability requires review",
+          },
+          origin: input.origin,
+        });
+        store.put("finding", finding);
+        store.event(farmId, "finding_ready", { record_id: finding.id });
+      }
+      const source = sources().find((s) => s.id === input.source_id);
+      if (source)
+        store.put("source", {
+          ...source,
+          farm_id: "public",
+          version: 1,
+          created_at: now(),
+          parser_version: "curated-document.v1",
+          capability: {
+            key: source.id,
+            status: "enabled",
+            reason:
+              "Attributed curated public document; individual applicability requires review",
+            requirements: [],
+          },
+          freshness: {
+            status: input.valid_until
+              ? Date.parse(input.valid_until) < Date.parse(now())
+                ? "stale"
+                : "fresh"
+              : "unknown",
+            retrieved_at: now(),
+            issued_at: input.issued_at,
+            valid_until: input.valid_until,
+          },
+        });
       return evidence;
     });
   }
@@ -603,8 +717,29 @@ export function createDataServices(
     sources,
     markSourceFailure,
     persistSeries,
+    transaction<T>(fn: () => T) {
+      return store.transaction(fn);
+    },
+    persistArtifact(raw: Uint8Array, hash: string) {
+      if (
+        raw.length > 25_000_000 ||
+        createHash("sha256").update(raw).digest("hex") !== hash
+      )
+        throw new DomainError("validation", "Artifact hash or size invalid");
+      store.put("source_artifact", {
+        ...base("public"),
+        id: hash,
+        hash,
+        bytes_base64: Buffer.from(raw).toString("base64"),
+      });
+    },
     importDocument,
-    insights(farmId: string, filter?: string, fieldId?: string) {
+    insights(
+      farmId: string,
+      filter?: string,
+      fieldId?: string,
+      range?: string,
+    ) {
       assertFarm(farmId);
       const farm = load(store, "farm", farmId, farmId, c.Farm);
       if (fieldId) load(store, "field", fieldId, farmId, c.Field);
@@ -634,8 +769,26 @@ export function createDataServices(
         (item) =>
           !filter || filter === item.variable || filter === item.source_id,
       );
+      const selected =
+        range && /^\d+(years|months|days)$/.test(range)
+          ? series.map((item) => {
+              const count = Number(range.replace(/\D/g, ""));
+              const latest = Date.parse(item.supported_range.to);
+              const span = range.endsWith("years")
+                ? count * 365.25
+                : range.endsWith("months")
+                  ? count * 30.44
+                  : count;
+              return {
+                ...item,
+                points: item.points.filter(
+                  (point) => Date.parse(point.time) >= latest - span * 86400000,
+                ),
+              };
+            })
+          : series;
       return c.Insights.parse({
-        series,
+        series: selected,
         capabilities: sources()
           .filter((s) => ["C01", "W01", "W03", "W04"].includes(s.id))
           .map((s) => s.capability),
@@ -674,6 +827,7 @@ export function createDataServices(
             params.farmId ?? "",
             filter.series,
             filter.field_id,
+            filter.range,
           );
         }
         default:
@@ -687,7 +841,12 @@ export async function refreshCoreEvidence(
   farmId: string,
   location: { latitude: number; longitude: number } | undefined,
   artifactDir: string,
-  options: { months?: number; forecastDays?: number; now?: Date } = {},
+  options: {
+    months?: number;
+    historicalDays?: number;
+    forecastDays?: number;
+    now?: Date;
+  } = {},
 ) {
   const current = options.now ?? new Date();
   const retrieved = current.toISOString();
@@ -771,8 +930,13 @@ export async function refreshCoreEvidence(
     return results;
   }
   for (const source of ["W03", "W04"] as const) {
+    const monthly = source === "W03" && options.months !== undefined;
     const count =
-      source === "W03" ? (options.months ?? 12) : (options.forecastDays ?? 7);
+      source === "W03"
+        ? monthly
+          ? (options.months ?? 12)
+          : (options.historicalDays ?? 30)
+        : (options.forecastDays ?? 7);
     if (count < 1 || count > (source === "W03" ? 60 : 16))
       throw new DomainError(
         "validation",
@@ -782,48 +946,80 @@ export async function refreshCoreEvidence(
     const hashes: string[] = [];
     let grid: z.infer<typeof c.GridMetadata> | undefined;
     const urls: string[] = [];
+    const failureDetails: string[] = [];
     let failures = 0;
+    let preliminary = 0;
+    let processedBytes = 0;
     for (let index = 0; index < count; index++) {
-      const date =
-        source === "W03"
-          ? new Date(
-              Date.UTC(
-                current.getUTCFullYear(),
-                current.getUTCMonth() - count + index,
-                1,
-              ),
-            )
-          : new Date(
-              Date.UTC(
-                current.getUTCFullYear(),
-                current.getUTCMonth(),
-                current.getUTCDate() + index,
-              ),
-            );
+      const date = monthly
+        ? new Date(
+            Date.UTC(
+              current.getUTCFullYear(),
+              current.getUTCMonth() - count + index,
+              1,
+            ),
+          )
+        : new Date(
+            Date.UTC(
+              current.getUTCFullYear(),
+              current.getUTCMonth(),
+              current.getUTCDate() +
+                (source === "W03" ? -count + 1 + index : index),
+            ),
+          );
       const year = date.getUTCFullYear();
       const month = String(date.getUTCMonth() + 1).padStart(2, "0");
       const day = String(date.getUTCDate()).padStart(2, "0");
       const issueYear = current.getUTCFullYear();
       const issueMonth = String(current.getUTCMonth() + 1).padStart(2, "0");
       const issueDay = String(current.getUTCDate()).padStart(2, "0");
-      const url =
-        source === "W03"
-          ? `https://data.chc.ucsb.edu/products/CHIRPS/v3.0/monthly/global/cogs/chirps-v3.0.${year}.${month}.cog`
+      let url = monthly
+        ? `https://data.chc.ucsb.edu/products/CHIRPS/v3.0/monthly/global/cogs/chirps-v3.0.${year}.${month}.cog`
+        : source === "W03"
+          ? `https://data.chc.ucsb.edu/products/CHIRPS/v3.0/daily/final/sat/${year}/chirps-v3.0.sat.${year}.${month}.${day}.tif`
           : `https://data.chc.ucsb.edu/products/CHIRPS-GEFS/v3/daily/global/${issueYear}/${issueMonth}/${issueDay}/c3g_${year}.${month}.${day}.tif`;
       urls.push(url);
       try {
-        const value = await extractRainfall(
-          url,
-          location.longitude,
-          location.latitude,
-          artifactDir,
-        );
+        if (processedBytes > 56_000_000)
+          throw new DomainError(
+            "unavailable",
+            "64MB source ingestion budget exhausted",
+          );
+        let value: Awaited<ReturnType<typeof extractRainfall>>;
+        try {
+          value = await extractRainfall(
+            url,
+            location.longitude,
+            location.latitude,
+            artifactDir,
+          );
+        } catch (error) {
+          if (source !== "W03" || monthly) throw error;
+          url = `https://data.chc.ucsb.edu/products/CHIRPS/v3.0/daily/prelim/sat/${year}/chirps-v3.0.prelim.${year}.${month}.${day}.tif`;
+          value = await extractRainfall(
+            url,
+            location.longitude,
+            location.latitude,
+            artifactDir,
+          );
+          preliminary++;
+        }
+        urls[urls.length - 1] = url;
+        processedBytes += value.bytes;
         grid = value.grid;
         hashes.push(value.hash);
         points.push({ time: date.toISOString(), value: value.value });
-      } catch {
+      } catch (error) {
         failures++;
-        points.push({ time: date.toISOString(), value: null });
+        const reason =
+          error instanceof DomainError
+            ? error.message.slice(0, 240)
+            : error instanceof Error &&
+                /abort|timeout/i.test(error.name + error.message)
+              ? "Bounded upstream request timed out"
+              : "Upstream fetch or raster decoding failed";
+        failureDetails.push(`${date.toISOString().slice(0, 10)}: ${reason}`);
+        points.push({ time: date.toISOString(), value: null, label: reason });
       }
     }
     if (!grid) {
@@ -834,7 +1030,7 @@ export async function refreshCoreEvidence(
       results.push({
         source,
         status: "unavailable",
-        reason: "No valid source grid sample; existing evidence retained",
+        reason: `No valid source grid sample; existing evidence retained. ${failureDetails.join("; ")}`,
       });
       continue;
     }
@@ -848,10 +1044,14 @@ export async function refreshCoreEvidence(
       farmId,
       {
         source_id: source,
-        method_version: "chirps-v3-containing-native-cell.v1",
+        method_version: monthly
+          ? "chirps-v3-monthly-native-cell.v1"
+          : source === "W03"
+            ? "chirps-v3-daily-sat-native-cell.v1"
+            : "chirps-gefs-v3-daily-native-cell.v1",
         variable:
           source === "W03" ? "historical_rainfall" : "forecast_rainfall",
-        unit: source === "W03" ? "mm/month" : "mm/day",
+        unit: monthly ? "mm/month" : "mm/day",
         kind: source === "W03" ? "observed" : "forecast",
         geography,
         resolution:
@@ -859,8 +1059,12 @@ export async function refreshCoreEvidence(
         grid,
         supported_range: { from: first, to: last },
         freshness: {
-          status: failures ? "partial" : "fresh",
+          status: failures || preliminary ? "partial" : "fresh",
           retrieved_at: retrieved,
+          reason:
+            source === "W03" && !monthly
+              ? `${preliminary} preliminary daily samples; ${failures} unpublished/failed daily samples. Preliminary estimates are replaced by final when available.`
+              : undefined,
           valid_until: source === "W04" ? validUntil : undefined,
         },
         completeness:
@@ -874,11 +1078,15 @@ export async function refreshCoreEvidence(
         source_id: source,
         title:
           source === "W03"
-            ? "CHIRPS v3 final monthly rainfall estimate"
+            ? monthly
+              ? "CHIRPS v3 final monthly rainfall estimate"
+              : "CHIRPS v3 daily sat-disaggregated rainfall estimate"
             : "CHIRPS-GEFS v3 ensemble mean daily rainfall forecast",
         text:
           source === "W03"
-            ? "Satellite/station-derived gridded estimate; not a rain gauge measurement. Final monthly publication may lag. Missing months remain gaps."
+            ? monthly
+              ? "Satellite/station-derived gridded estimate; not a rain gauge measurement. Final monthly publication may lag. Missing months remain gaps."
+              : `Daily sat product disaggregates CHIRPS pentad totals using IMERG Late V07 (native0.1° bilinearly resampled to0.05°); not station-day rain measurements and not a uniform all-station 24h window. ${preliminary} preliminary samples retained with replacement by final; ${failures} missing days remain gaps. Failures: ${failureDetails.join("; ")}. Data files: ${urls.join(" ")}`
             : `Forecast issued ${current.toISOString().slice(0, 10)}, bias-corrected ensemble mean; not ensemble percentiles and not a guarantee. Data files: ${urls.join(" ")}`,
         url: urls[0],
         issued_at:
@@ -897,12 +1105,16 @@ export async function refreshCoreEvidence(
         geography,
         resolution: "0.05 degree",
         grid,
-        unit: source === "W03" ? "mm/month" : "mm/day",
+        unit: monthly ? "mm/month" : "mm/day",
         kind: source === "W03" ? "observation" : "forecast",
         origin: "live_source",
         hash,
         hash_kind: "collection_manifest_sha256",
-        method_version: "chirps-v3-containing-native-cell.v1",
+        method_version: monthly
+          ? "chirps-v3-monthly-native-cell.v1"
+          : source === "W03"
+            ? "chirps-v3-daily-sat-native-cell.v1"
+            : "chirps-gefs-v3-daily-native-cell.v1",
         citation: {
           section: "CHC native grid; range artifact manifest hashes",
         },
@@ -912,9 +1124,106 @@ export async function refreshCoreEvidence(
       source,
       status: failures ? "partial" : "enabled",
       reason: failures
-        ? `${failures} unavailable periods retained as gaps`
+        ? `${failures} unavailable periods retained as gaps: ${failureDetails.join("; ")}`
         : undefined,
     });
   }
   return results;
+}
+/** Operator-import boundary for actual attributable public quotes. No records are synthesized by connectors. */
+export const MarketImport = z
+  .object({
+    source_id: z.enum(["M01", "M02"]),
+    url: z.url(),
+    hash: z.string(),
+    market: z.string().min(1),
+    state: z.string().min(1),
+    commodity: z.string().min(1),
+    variety: z.string().min(1),
+    grade: z.string().min(1),
+    price_date: z.iso.date(),
+    unit: z.literal("INR/quintal"),
+    minimum: c.Money,
+    modal: c.Money,
+    maximum: c.Money,
+  })
+  .superRefine((input, ctx) => {
+    if (
+      [input.minimum, input.modal, input.maximum].some(
+        (x) => x.currency !== "INR" || x.minor_units < 0,
+      ) ||
+      input.minimum.minor_units > input.modal.minor_units ||
+      input.modal.minor_units > input.maximum.minor_units
+    )
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "Quote requires nonnegative INR prices in minimum≤modal≤maximum order",
+      });
+  });
+export function importMarketQuote(
+  services: ReturnType<typeof createDataServices>,
+  farmId: string,
+  value: unknown,
+  raw: Uint8Array,
+) {
+  const input = MarketImport.parse(value);
+  assertSourceUrl(input.url);
+  if (createHash("sha256").update(raw).digest("hex") !== input.hash)
+    throw new DomainError("validation", "Market raw artifact hash mismatch");
+  const time = `${input.price_date}T00:00:00+05:30`;
+  if (Date.parse(time) > Date.now())
+    throw new DomainError(
+      "validation",
+      "Observed quote date cannot be in the future",
+    );
+  const text = `Observed public quote: ${input.market}, ${input.state}; ${input.commodity}; variety ${input.variety}; grade ${input.grade}; ${input.price_date}; INR/quintal. Minimum ${input.minimum.minor_units / 100}, modal ${input.modal.minor_units / 100}, maximum ${input.maximum.minor_units / 100}. Actual sale terms/costs and field harvest quality are unknown.`;
+  return services.transaction(() => {
+    services.persistArtifact(raw, input.hash);
+    return services.persistSeries(
+      farmId,
+      {
+        source_id: input.source_id,
+        method_version: "attributed-market-quote.v1",
+        variable: `market_price:${input.market}:${input.commodity}:${input.variety}:${input.grade}`,
+        unit: "INR/quintal",
+        kind: "observed",
+        geography: `${input.market}, ${input.state}`,
+        resolution: "Market/variety/grade/date",
+        supported_range: { from: time, to: time },
+        freshness: {
+          status: "unknown",
+          retrieved_at: new Date().toISOString(),
+          reason: "Observed dated quote is not a current guaranteed sale price",
+        },
+        completeness: "complete",
+        points: [
+          {
+            time,
+            value: input.modal.minor_units / 100,
+            lower: input.minimum.minor_units / 100,
+            upper: input.maximum.minor_units / 100,
+          },
+        ],
+        origin: "imported_source",
+      },
+      {
+        source_id: input.source_id,
+        title: `${input.commodity} ${input.market} dated quote`,
+        text,
+        url: input.url,
+        retrieved_at: new Date().toISOString(),
+        issued_at: time,
+        source_time_precision: "date",
+        geography: `${input.market}, ${input.state}`,
+        unit: "INR/quintal",
+        kind: "observation",
+        origin: "imported_source",
+        hash: input.hash,
+        hash_kind: "full_artifact_sha256",
+        method_version: "attributed-market-quote.v1",
+        citation: { section: "Operator-verified attributed public quote" },
+      },
+    );
+  });
 }

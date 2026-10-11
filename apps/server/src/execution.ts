@@ -101,6 +101,7 @@ export function createExecution(
   }
   function refs(run: c.Run, values: z.infer<typeof c.EvidenceRef>[]) {
     const permitted = new Set(evidence(run, {}).map((x) => x.id));
+    const profile = farm.assertFarm(run.farm_id);
     for (const ref of values) {
       const item = load(
         store,
@@ -109,11 +110,65 @@ export function createExecution(
         run.farm_id,
         c.Evidence,
       );
-      if (!permitted.has(item.id) || item.snapshot_id !== ref.snapshot_id)
+      if (
+        !permitted.has(item.id) ||
+        item.snapshot_id !== ref.snapshot_id ||
+        item.source_id !== ref.source_id
+      )
         throw new DomainError(
           "scope_denied",
           "Evidence reference is outside this role/field or snapshot",
         );
+      if (
+        item.valid_until &&
+        Date.parse(item.valid_until) < Date.now() &&
+        (item.kind === "forecast" || item.kind === "guidance")
+      )
+        throw new DomainError(
+          "source_stale",
+          "Expired forecast/guidance cannot support a current proposal; refresh it first",
+        );
+      if (
+        item.grid &&
+        (item.grid.latitude !== profile.location?.latitude ||
+          item.grid.longitude !== profile.location?.longitude)
+      )
+        throw new DomainError(
+          "scope_denied",
+          "Spatial evidence refers to an earlier farm location",
+        );
+      if (item.source_id.startsWith("W") || item.source_id.startsWith("A")) {
+        const district = profile.location?.district;
+        if (
+          !item.grid &&
+          (!district ||
+            !item.geography.toLowerCase().includes(district.toLowerCase()))
+        )
+          throw new DomainError(
+            "scope_denied",
+            "District applicability has not been verified for this evidence",
+          );
+      }
+      const applicability = z
+        .object({ crops: z.array(z.string()).optional() })
+        .safeParse(store.get("document_applicability", item.id, run.farm_id));
+      if (applicability.success && applicability.data.crops?.length) {
+        const crops = store
+          .list("field", run.farm_id)
+          .map((x) => c.Field.parse(x))
+          .filter((x) => !run.field_id || x.id === run.field_id)
+          .flatMap((x) => (x.crop ? [x.crop.toLowerCase()] : []));
+        if (
+          crops.length &&
+          !crops.some((x) =>
+            applicability.data.crops?.map((y) => y.toLowerCase()).includes(x),
+          )
+        )
+          throw new DomainError(
+            "scope_denied",
+            "Document crop differs from selected crop",
+          );
+      }
     }
   }
   function tools(run: c.Run): RuntimeTurn["tools"] {
@@ -121,6 +176,37 @@ export function createExecution(
       readFacts: async () => {
         check(run, "read");
         return authorizeSend(run);
+      },
+      recallMemory: async (query) => {
+        check(run, "memory");
+        const facts = authorizeSend(run);
+        const versions = new Map(facts.map((x) => [x.id, x.version]));
+        const terms = query.match(/[\p{L}\p{N}_]+/gu)?.slice(0, 12) ?? [];
+        if (!terms.length) return [];
+        const rows = store.db
+          .prepare(
+            "SELECT id FROM memory_fts WHERE farm_id=? AND role_key=? AND memory_fts MATCH ? LIMIT 20",
+          )
+          .all(
+            run.farm_id,
+            run.role_key,
+            terms.map((x) => `"${x}"`).join(" OR "),
+          ) as { id: string }[];
+        return rows.flatMap((row) => {
+          const item = z
+            .object({
+              text: z.string(),
+              field_id: c.Id.optional(),
+              fact_versions: z.record(c.Id, z.number()),
+            })
+            .parse(store.get("memory", row.id, run.farm_id));
+          return (!item.field_id || item.field_id === run.field_id) &&
+            Object.entries(item.fact_versions).every(
+              ([id, version]) => versions.get(id) === version,
+            )
+            ? [{ text: item.text }]
+            : [];
+        });
       },
       lookupEvidence: async (query) => {
         check(run, "read");
@@ -206,6 +292,18 @@ export function createExecution(
           "peer",
           (peerGrants[run.role_key] as readonly string[]).includes(recipient),
         );
+        const recipientFacts = new Set(
+          core
+            .contextFacts(run.farm_id, recipient, true, run.field_id)
+            .map((x) => x.id),
+        );
+        if (
+          authorizeSend(run).some((f) => f.private && !recipientFacts.has(f.id))
+        )
+          throw new DomainError(
+            "consent_required",
+            "Peer recipient is not granted the private context used by this turn",
+          );
         const count = store.db
           .prepare(
             "SELECT count(*) as count FROM inbox WHERE farm_id=? AND sender=? AND json_extract(payload,'$.origin_run')=?",
@@ -265,6 +363,12 @@ export function createExecution(
             ),
         );
       run = state(run, "running");
+      store.put("agent_instance", {
+        ...farm.makeBase(run.farm_id),
+        id: run.role_key,
+        role_key: run.role_key,
+        runtime: (await runtime.getCapabilities()).version,
+      });
       message = c.Message.parse({
         ...farm.makeBase(run.farm_id),
         field_id: run.field_id,
@@ -302,7 +406,15 @@ export function createExecution(
         },
         onText: async (text) => {
           if (stopped) throw new DomainError("interrupted", "Backend stopping");
-          authorizeSend(run);
+          const currentFacts = authorizeSend(run);
+          if (
+            JSON.stringify(currentFacts.map((x) => [x.id, x.version])) !==
+            JSON.stringify(facts.map((x) => [x.id, x.version]))
+          )
+            throw new DomainError(
+              "interrupted",
+              "Farmer context changed during the turn; preserve partial answer and ask again",
+            );
           check(run, "read");
           if (!message) return;
           message = {
@@ -332,6 +444,22 @@ export function createExecution(
         store.transaction(() => {
           store.put("message", finalMessage);
           state(current(run), "completed");
+          const memory = {
+            ...farm.makeBase(run.farm_id),
+            role_key: run.role_key,
+            field_id: run.field_id,
+            text: result.text.slice(0, 8000),
+            fact_versions: Object.fromEntries(
+              facts.map((x) => [x.id, x.version]),
+            ),
+            origin_run: run.id,
+          };
+          store.put("memory", memory);
+          store.db
+            .prepare(
+              "INSERT INTO memory_fts(id,farm_id,role_key,content) VALUES(?,?,?,?)",
+            )
+            .run(memory.id, run.farm_id, run.role_key, memory.text);
           store.event(run.farm_id, "message_final", {
             record_id: finalMessage.id,
             run_id: run.id,
@@ -412,6 +540,16 @@ export function createExecution(
           { farmId, conversationId: conversation.id },
         ),
       );
+      const peerMessage = store
+        .list("message", farmId)
+        .map((x) => c.Message.parse(x))
+        .find((x) => x.conversation_id === conversation.id);
+      if (peerMessage)
+        store.put("message", {
+          ...peerMessage,
+          author: "system",
+          version: peerMessage.version + 1,
+        });
       store.put("peer_run", {
         ...farm.makeBase(farmId),
         id: receiving.id,
@@ -457,6 +595,39 @@ export function createExecution(
           const id = z.object({ id: c.Id }).parse(record).id;
           store.remove("memory", id, job.farm_id);
         }
+        for (const raw of store.list("finding", job.farm_id)) {
+          const finding = c.Finding.parse(raw);
+          store.put("finding", {
+            ...finding,
+            freshness: {
+              ...finding.freshness,
+              status: "stale",
+              reason: "Farm context changed; review before reuse",
+            },
+            version: finding.version + 1,
+            updated_at: now(),
+          });
+        }
+        if (
+          store
+            .list("revision", job.farm_id)
+            .some((raw) => c.PlanRevision.parse(raw).status === "approved")
+        ) {
+          const alert = c.Alert.parse({
+            ...farm.makeBase(job.farm_id),
+            title: "Farm context changed",
+            summary:
+              "Review the approved plan against corrected facts or changed privacy grants. Its commitments and recorded work remain unchanged.",
+            severity: "advisory",
+            role_key: "chief_of_staff",
+            status: "active",
+            evidence: [],
+            issued_at: now(),
+            freshness: { status: "fresh" },
+          });
+          store.put("alert", alert);
+          store.event(job.farm_id, "alert_changed", { record_id: alert.id });
+        }
         for (const run of store
           .list("run", job.farm_id)
           .map((x) => c.Run.parse(x)))
@@ -470,6 +641,25 @@ export function createExecution(
       });
     } catch (error) {
       if (stopped) return;
+      if (job.kind === "lifecycle") {
+        const parsed = z.object({ job_id: c.Id }).safeParse(job.payload);
+        if (parsed.success) {
+          const record = store.get("job", parsed.data.job_id, job.farm_id);
+          if (record) {
+            const failed = c.Job.parse(record);
+            store.put("job", {
+              ...failed,
+              status: "failed",
+              progress:
+                error instanceof DomainError
+                  ? error.message
+                  : "Lifecycle processing failed",
+              version: failed.version + 1,
+              updated_at: now(),
+            });
+          }
+        }
+      }
       store.finishJob(
         job.id,
         { reason: error instanceof DomainError ? error.message : "Job failed" },

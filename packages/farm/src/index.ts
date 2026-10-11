@@ -81,6 +81,7 @@ export function createFarmServices(
   };
   function saveFact(input: unknown, farmId: string, correctsId?: string) {
     assertFarm(farmId);
+    assertMutationAllowed(store, farmId);
     const parsed = c.operations.saveFact.input.parse(input);
     if (parsed.farm_id !== farmId)
       throw new DomainError("scope_denied", "Fact belongs to another farm");
@@ -129,6 +130,8 @@ export function createFarmServices(
     ): unknown {
       return store.transaction(() => {
         const farmId = params.farmId ?? "";
+        if (c.operations[name].method !== "GET")
+          assertMutationAllowed(store, farmId);
         const data = c.operations[name].input.parse(input);
         switch (name) {
           case "createFarm": {
@@ -368,3 +371,21 @@ export {
   createDomainServices,
   moneyTotal,
 } from "./domain.js";
+
+export function assertMutationAllowed(store: Store, farmId: string) {
+  if (
+    farmId &&
+    store.list("job", farmId).some((value) => {
+      const job = c.Job.safeParse(value);
+      return (
+        job.success &&
+        job.data.kind === "deletion" &&
+        ["queued", "running"].includes(job.data.status)
+      );
+    })
+  )
+    throw new DomainError(
+      "permission_denied",
+      "Farm deletion is pending; wait for its outcome before changing records",
+    );
+}

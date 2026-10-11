@@ -119,6 +119,7 @@ export type CodexConfiguration = {
 };
 export const gatewaySchemas = {
   read_farm_facts: z.object({}).strict(),
+  recall_memory: z.object({ query: z.string().min(1).max(1000) }).strict(),
   lookup_evidence: z
     .object({
       source_id: z.string().optional(),
@@ -159,6 +160,10 @@ export async function invokeScopedTool(
     case "read_farm_facts":
       gatewaySchemas.read_farm_facts.parse(args);
       return turn.tools.readFacts();
+    case "recall_memory":
+      return turn.tools.recallMemory(
+        gatewaySchemas.recall_memory.parse(args).query,
+      );
     case "lookup_evidence":
       return turn.tools.lookupEvidence(
         gatewaySchemas.lookup_evidence.parse(args),
@@ -298,7 +303,7 @@ export class CodexRuntime implements Runtime {
           this.configuration.loaderPath,
           this.configuration.bridgeEntrypoint,
         ]
-      : [this.configuration.bridgeEntrypoint];
+      : ["--conditions=sakha-release", this.configuration.bridgeEntrypoint];
     const binary = realpathSync(
       this.configuration.binary ??
         execFileSync("which", ["codex"], { encoding: "utf8" }).trim(),
@@ -306,6 +311,14 @@ export class CodexRuntime implements Runtime {
     const filePermissions: Record<string, unknown> = {
       ":root": "deny",
       ":minimal": "read",
+      ":tmpdir": "deny",
+      ":slash_tmp": "deny",
+      "/tmp": "deny",
+      "/private/tmp": "deny",
+      "/Users": "deny",
+      "/home": "deny",
+      [realpathSync(tmpdir())]: "deny",
+      [realpathSync(cwd)]: "read",
       ":workspace_roots": { ".": "read" },
       [binary]: "read",
     };
@@ -330,11 +343,21 @@ export class CodexRuntime implements Runtime {
       "-c",
       "features.apps=false",
       "-c",
+      "features.code_mode_host=true",
+      "-c",
+      "features.code_mode=false",
+      "-c",
       "features.shell_tool=false",
       "-c",
       "features.unified_exec=false",
       "-c",
       "features.browser_use=false",
+      "-c",
+      "features.browser_use_external=false",
+      "-c",
+      "features.browser_use_full_cdp_access=false",
+      "-c",
+      "features.in_app_browser=false",
       "-c",
       "features.computer_use=false",
     ];
@@ -364,6 +387,27 @@ export class CodexRuntime implements Runtime {
         },
       });
       connection.notify("initialized");
+      const inherited = z
+        .object({
+          data: z.array(z.object({ name: z.string() })),
+          nextCursor: z.string().nullable(),
+        })
+        .parse(
+          await connection.request("mcpServerStatus/list", {
+            limit: 100,
+            detail: "toolsAndAuthOnly",
+          }),
+        );
+      if (inherited.nextCursor)
+        throw new DomainError(
+          "permission_denied",
+          "Inherited MCP inventory exceeds isolation bound",
+        );
+      const disabledServers = Object.fromEntries(
+        inherited.data
+          .filter((server) => server.name !== "sakha")
+          .map((server) => [server.name, { enabled: false }]),
+      );
       const started = z.object({ thread: z.object({ id: z.string() }) }).parse(
         await connection.request("thread/start", {
           ephemeral: true,
@@ -377,8 +421,12 @@ export class CodexRuntime implements Runtime {
           config: {
             web_search: "disabled",
             mcp_servers: {
+              ...disabledServers,
               sakha: {
                 command: process.execPath,
+                required: true,
+                enabled_tools: Object.keys(gatewaySchemas),
+                default_tools_approval_mode: "approve",
                 args: mcpArgs,
                 env: {
                   SAKHA_RUN_GATEWAY: `http://127.0.0.1:${address.port}`,
@@ -392,6 +440,42 @@ export class CodexRuntime implements Runtime {
         }),
       );
       const threadId = started.thread.id;
+      const inventory = z
+        .object({
+          data: z.array(
+            z.object({
+              name: z.string(),
+              tools: z.record(z.string(), z.unknown()),
+            }),
+          ),
+          nextCursor: z.string().nullable(),
+        })
+        .parse(
+          await connection.request("mcpServerStatus/list", {
+            threadId,
+            limit: 100,
+            detail: "toolsAndAuthOnly",
+          }),
+        );
+      if (
+        inventory.nextCursor ||
+        inventory.data.some(
+          (server) =>
+            (server.name !== "sakha" && Object.keys(server.tools).length > 0) ||
+            (server.name === "sakha" &&
+              Object.keys(server.tools).some(
+                (key) => !Object.keys(gatewaySchemas).includes(key),
+              )),
+        ) ||
+        !inventory.data.some(
+          (server) =>
+            server.name === "sakha" && Object.keys(server.tools).length > 0,
+        )
+      )
+        throw new DomainError(
+          "permission_denied",
+          "Codex tool inventory differs from scoped Sakha configuration",
+        );
       this.active.set(turn.run.id, { connection, threadId });
       const result = new Promise<{ text: string }>((resolve, reject) => {
         rejectInterrupted = reject;

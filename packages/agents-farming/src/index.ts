@@ -49,14 +49,14 @@ const definitions = [
       "government_support",
       "chief_of_staff",
     ],
-    ["A02", "A03", "A04", "W01"],
+    ["A01", "A02", "A03", "A04", "A07", "W01"],
   ],
   [
     "Water & Irrigation",
     "Manage Water",
     "Measured water feasibility and allocation",
     ["climate", "weather", "crop_planning", "crop_care", "chief_of_staff"],
-    ["W01", "W03", "W04"],
+    ["A01", "A07", "W01", "W03", "W04"],
   ],
   [
     "Market & Sales",

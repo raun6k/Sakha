@@ -1,5 +1,11 @@
 import * as c from "@sakha/contracts";
-import { DomainError, load, requireVersion, type Store } from "./index.js";
+import {
+  assertMutationAllowed,
+  DomainError,
+  load,
+  requireVersion,
+  type Store,
+} from "./index.js";
 export function convertQuantity(value: c.Quantity, target: string): c.Quantity {
   if (value.kind !== "known" && value.kind !== "range") return value;
   const scale: Record<string, number> = {
@@ -92,6 +98,8 @@ export function createDomainServices(
     ): unknown {
       return store.transaction(() => {
         const farmId = params.farmId ?? "";
+        if (c.operations[name].method !== "GET")
+          assertMutationAllowed(store, farmId);
         assertFarm(farmId);
         switch (name) {
           case "createScenario": {
@@ -119,8 +127,7 @@ export function createDomainServices(
             const proceeds = request.inputs.proceeds;
             if (
               (request.kind === "crop_budget" ||
-                request.kind === "financial_comparison" ||
-                request.kind === "market_proceeds") &&
+                request.kind === "financial_comparison") &&
               cost &&
               proceeds &&
               typeof cost === "object" &&
@@ -133,10 +140,248 @@ export function createDomainServices(
                   "validation",
                   "Cost and proceeds currencies differ",
                 );
+              if (cost.minor_units < 0 || proceeds.minor_units < 0)
+                throw new DomainError(
+                  "validation",
+                  "Costs and proceeds must be nonnegative",
+                );
               results.margin = moneyTotal([
                 proceeds,
                 { ...cost, minor_units: -cost.minor_units },
               ]);
+            } else if (
+              ["water_budget", "irrigation_allocation"].includes(request.kind)
+            ) {
+              const available = c.Quantity.safeParse(
+                request.inputs.available_water,
+              );
+              const need = c.Quantity.safeParse(request.inputs.irrigation_need);
+              const area = c.Quantity.safeParse(request.inputs.area);
+              if (!available.success || available.data.kind !== "known")
+                missing.push(
+                  "Measured available_water volume; qualitative water is not a volume",
+                );
+              if (!need.success || need.data.kind !== "known")
+                missing.push(
+                  "Explicit irrigation_need with source/method; crop coefficients remain unverified",
+                );
+              if (
+                area.success &&
+                area.data.kind === "known" &&
+                area.data.value <= 0
+              )
+                throw new DomainError("validation", "Area must be positive");
+              if (
+                need.success &&
+                need.data.kind === "known" &&
+                need.data.value < 0
+              )
+                throw new DomainError(
+                  "validation",
+                  "Irrigation need cannot be negative",
+                );
+              if (
+                available.success &&
+                need.success &&
+                available.data.kind === "known" &&
+                need.data.kind === "known"
+              ) {
+                const supply = convertQuantity(available.data, "m3");
+                let demand: c.Quantity;
+                if (need.data.unit === "mm") {
+                  if (!area.success || area.data.kind !== "known") {
+                    missing.push(
+                      "Measured area required to convert mm depth to volume",
+                    );
+                    demand = { kind: "unknown", reason: "Area missing" };
+                  } else {
+                    const hectares = convertQuantity(area.data, "ha");
+                    demand =
+                      hectares.kind === "known"
+                        ? {
+                            kind: "known",
+                            value: need.data.value * hectares.value * 10,
+                            unit: "m3",
+                          }
+                        : { kind: "unknown", reason: "Area missing" };
+                  }
+                } else demand = convertQuantity(need.data, "m3");
+                if (supply.kind === "known" && demand.kind === "known") {
+                  if (supply.value < 0 || demand.value < 0)
+                    throw new DomainError(
+                      "validation",
+                      "Water volumes cannot be negative",
+                    );
+                  results.available_volume = supply;
+                  results.required_volume = demand;
+                  results.balance = {
+                    kind: "known",
+                    value: supply.value - demand.value,
+                    unit: "m3",
+                  };
+                  results.feasibility =
+                    supply.value >= demand.value
+                      ? "Supplied demand fits supplied available volume; not agronomic adequacy"
+                      : "Supplied demand exceeds supplied available volume";
+                }
+              }
+            } else if (request.kind === "crop_budget") {
+              const costs = [
+                request.inputs.input_cost,
+                request.inputs.labour_cost,
+              ].flatMap((value) => {
+                const parsed = c.Money.safeParse(value);
+                return parsed.success ? [parsed.data] : [];
+              });
+              if (costs.some((x) => x.minor_units < 0))
+                throw new DomainError(
+                  "validation",
+                  "Costs must be nonnegative",
+                );
+              if (costs.length === 2) results.total_cost = moneyTotal(costs);
+              else missing.push("Explicit input_cost and labour_cost amounts");
+            } else if (request.kind === "market_proceeds") {
+              const price = c.Money.safeParse(request.inputs.price);
+              const quantity = c.Quantity.safeParse(request.inputs.quantity);
+              const costs = c.Money.safeParse(request.inputs.costs);
+              if (
+                price.success &&
+                quantity.success &&
+                quantity.data.kind === "known" &&
+                costs.success
+              ) {
+                if (costs.data.minor_units < 0)
+                  throw new DomainError(
+                    "validation",
+                    "Costs must be nonnegative",
+                  );
+                const kg = convertQuantity(quantity.data, "kg");
+                if (kg.kind === "known") {
+                  const gross = price.data.minor_units * kg.value;
+                  if (
+                    !Number.isSafeInteger(gross) ||
+                    kg.value < 0 ||
+                    price.data.minor_units < 0
+                  )
+                    throw new DomainError(
+                      "validation",
+                      "Price×quantity requires a safe minor-unit amount and nonnegative inputs",
+                    );
+                  results.gross_proceeds = {
+                    currency: price.data.currency,
+                    minor_units: gross,
+                  };
+                  results.net_proceeds = moneyTotal([
+                    { currency: price.data.currency, minor_units: gross },
+                    { ...costs.data, minor_units: -costs.data.minor_units },
+                  ]);
+                }
+              } else
+                missing.push(
+                  "Explicit price per kg, quantity and costs; supplied price is hypothetical unless dated source is cited",
+                );
+            } else if (request.kind === "sale_storage") {
+              const quantity = c.Quantity.safeParse(request.inputs.quantity);
+              const sale = c.Money.safeParse(request.inputs.sale_price);
+              const future = c.Money.safeParse(request.inputs.future_price);
+              const costs = c.Money.safeParse(request.inputs.storage_cost);
+              const loss = c.Quantity.safeParse(request.inputs.loss);
+              if (
+                quantity.success &&
+                quantity.data.kind === "known" &&
+                sale.success
+              ) {
+                const kg = convertQuantity(quantity.data, "kg");
+                if (kg.kind === "known") {
+                  if (kg.value < 0 || sale.data.minor_units < 0)
+                    throw new DomainError(
+                      "validation",
+                      "Sale price and quantity must be nonnegative",
+                    );
+                  const gross = kg.value * sale.data.minor_units;
+                  if (!Number.isSafeInteger(gross))
+                    throw new DomainError(
+                      "validation",
+                      "Sale proceeds exceed safe minor-unit precision",
+                    );
+                  results.sale_now_proceeds = {
+                    currency: sale.data.currency,
+                    minor_units: gross,
+                  };
+                  if (
+                    future.success &&
+                    costs.success &&
+                    loss.success &&
+                    loss.data.kind === "known" &&
+                    loss.data.unit === "percent"
+                  ) {
+                    if (
+                      loss.data.value < 0 ||
+                      loss.data.value > 100 ||
+                      future.data.minor_units < 0 ||
+                      costs.data.minor_units < 0
+                    )
+                      throw new DomainError(
+                        "validation",
+                        "Storage scenario requires nonnegative prices/costs and loss between0 and100percent",
+                      );
+                    const hypothetical =
+                      kg.value *
+                      (1 - loss.data.value / 100) *
+                      future.data.minor_units;
+                    if (!Number.isSafeInteger(hypothetical))
+                      throw new DomainError(
+                        "validation",
+                        "Hypothetical proceeds exceed minor-unit precision",
+                      );
+                    results.storage_hypothesis_net = moneyTotal([
+                      {
+                        currency: future.data.currency,
+                        minor_units: hypothetical,
+                      },
+                      { ...costs.data, minor_units: -costs.data.minor_units },
+                    ]);
+                    results.qualification =
+                      "Future price and loss are supplied hypotheses; storage risk and future prices are not verified";
+                  } else
+                    missing.push(
+                      "Explicit storage loss percentage, future-price hypothesis and storage_cost; unknown loss is not zero",
+                    );
+                }
+              } else missing.push("Known quantity and sale_price per kg");
+            } else if (
+              [
+                "scheme_checklist",
+                "crop_care",
+                "planting_plan",
+                "crop_comparison",
+                "seasonal_risk",
+              ].includes(request.kind)
+            ) {
+              const actual = request.evidence.map((ref) =>
+                load(store, "evidence", ref.evidence_id, farmId, c.Evidence),
+              );
+              if (actual.length)
+                results.source_guidance = actual
+                  .map(
+                    (x) =>
+                      `${x.title}: ${x.text} (${x.url ?? "source metadata"})`,
+                  )
+                  .join("\n");
+              if (request.kind === "scheme_checklist") {
+                results.eligibility =
+                  "Not determined; verify current jurisdiction, seasonal notification and farmer-specific requirements with the official authority";
+                missing.push(
+                  "Current state/crop enrollment and individual eligibility require official verification",
+                );
+              } else if (request.kind === "crop_care") {
+                missing.push(
+                  "Confirm actual crop stage, field condition and current applicable advisory; no chemical prescription inferred",
+                );
+              } else
+                missing.push(
+                  "Sourced local crop/demand method and verified physical/financial constraints; climate index is not a farm yield forecast",
+                );
             } else
               missing.push(
                 "Verified domain method and applicable source evidence",
@@ -146,10 +391,37 @@ export function createDomainServices(
               request,
               status: missing.length ? "needs_information" : "available",
               results,
-              constraints: [],
+              constraints:
+                results.balance &&
+                typeof results.balance === "object" &&
+                "kind" in results.balance &&
+                results.balance.kind === "known"
+                  ? [
+                      {
+                        key: "supplied_water_balance",
+                        label: "Supplied water volume feasibility",
+                        status:
+                          results.balance.value >= 0 ? "satisfied" : "failed",
+                        critical: true,
+                        reason:
+                          "Comparison of explicit supplied volumes only; crop demand and agronomic adequacy need an attributed method",
+                        evidence: request.evidence,
+                      },
+                    ]
+                  : [],
               missing_inputs: missing,
               method_version: Object.keys(results).length
-                ? "money-arithmetic.v1"
+                ? ["water_budget", "irrigation_allocation"].includes(
+                    request.kind,
+                  )
+                  ? "supplied-water-volume-arithmetic.v1"
+                  : request.kind === "market_proceeds"
+                    ? "supplied-kg-price-proceeds.v1"
+                    : request.kind === "sale_storage"
+                      ? "supplied-sale-storage-hypothesis.v1"
+                      : results.total_cost
+                        ? "supplied-cost-sum.v1"
+                        : "supplied-money-margin.v1"
                 : "domain-method-unavailable.v1",
               origin: "derived_calculation",
             });
@@ -166,24 +438,44 @@ export function createDomainServices(
             );
           case "listFindings":
             return {
-              items: store.list("finding", farmId).filter((raw) => {
-                const finding = c.Finding.parse(raw);
-                return (
-                  !c.operations.listFindings.input.parse(input).role_key ||
-                  finding.role_key ===
-                    c.operations.listFindings.input.parse(input).role_key
-                );
-              }),
+              items: store
+                .list("finding", farmId)
+                .map((raw) => {
+                  const finding = c.Finding.parse(raw);
+                  return finding.freshness.valid_until &&
+                    finding.freshness.valid_until < now()
+                    ? {
+                        ...finding,
+                        freshness: { ...finding.freshness, status: "stale" },
+                      }
+                    : finding;
+                })
+                .filter((raw) => {
+                  const finding = c.Finding.parse(raw);
+                  return (
+                    !c.operations.listFindings.input.parse(input).role_key ||
+                    finding.role_key ===
+                      c.operations.listFindings.input.parse(input).role_key
+                  );
+                }),
               next_cursor: null,
             };
-          case "getFinding":
-            return load(
+          case "getFinding": {
+            const finding = load(
               store,
               "finding",
               params.findingId ?? "",
               farmId,
               c.Finding,
             );
+            return finding.freshness.valid_until &&
+              finding.freshness.valid_until < now()
+              ? {
+                  ...finding,
+                  freshness: { ...finding.freshness, status: "stale" },
+                }
+              : finding;
+          }
           case "getPlan":
             return plan(farmId);
           case "listPlanRevisions":
@@ -209,8 +501,43 @@ export function createDomainServices(
                 "version_conflict",
                 "Plan base no longer matches the active approved revision",
               );
-            for (const findingId of data.findings)
-              load(store, "finding", findingId, farmId, c.Finding);
+            const supporting = data.findings.map((findingId) =>
+              load(store, "finding", findingId, farmId, c.Finding),
+            );
+            data.constraints.push(
+              ...supporting.flatMap((finding) => finding.constraints),
+            );
+            data.missing_inputs.push(
+              ...supporting.flatMap((finding) => finding.missing_inputs),
+            );
+            for (const finding of supporting)
+              if (
+                finding.freshness.valid_until &&
+                finding.freshness.valid_until < now()
+              )
+                throw new DomainError(
+                  "source_stale",
+                  "Plan finding has expired; review current evidence",
+                );
+            for (const task of data.tasks) {
+              if (task.field_id)
+                load(store, "field", task.field_id, farmId, c.Field);
+              if (
+                task.role_key === "water" &&
+                !supporting.some(
+                  (finding) =>
+                    finding.role_key === "water" &&
+                    finding.constraints.some(
+                      (constraint) =>
+                        constraint.critical &&
+                        constraint.status === "satisfied",
+                    ),
+                )
+              )
+                data.missing_inputs.push(
+                  `Verified physical water feasibility for task: ${task.title}`,
+                );
+            }
             for (const ref of data.evidence)
               load(store, "evidence", ref.evidence_id, farmId, c.Evidence);
             const recordBase = base(farmId);
@@ -376,6 +703,15 @@ export function createDomainServices(
                   "version_conflict",
                   "Activity already corrected",
                 );
+              if (
+                d.task_id !== original.task_id ||
+                d.field_id !== original.field_id ||
+                d.kind !== original.kind
+              )
+                throw new DomainError(
+                  "validation",
+                  "Correction must preserve the original task, field and work kind",
+                );
               correctsId = original.id;
             }
             if (
@@ -398,6 +734,16 @@ export function createDomainServices(
                 throw new DomainError(
                   "version_conflict",
                   "Task work was already confirmed",
+                );
+              if (task.field_id && task.field_id !== d.field_id)
+                throw new DomainError(
+                  "scope_denied",
+                  "Work field differs from task field",
+                );
+              if (task.role_key === "water" && d.kind !== "irrigation")
+                throw new DomainError(
+                  "validation",
+                  "Water task requires irrigation work confirmation",
                 );
               store.put("task", {
                 ...task,
@@ -445,9 +791,39 @@ export function createDomainServices(
             return updated;
           }
           case "listAlerts":
-            return { items: store.list("alert", farmId), next_cursor: null };
-          case "getAlert":
-            return load(store, "alert", params.alertId ?? "", farmId, c.Alert);
+            return {
+              items: store.list("alert", farmId).map((value) => {
+                const alert = c.Alert.parse(value);
+                return alert.status === "active" &&
+                  alert.valid_until &&
+                  alert.valid_until < now()
+                  ? {
+                      ...alert,
+                      status: "expired",
+                      freshness: { ...alert.freshness, status: "stale" },
+                    }
+                  : alert;
+              }),
+              next_cursor: null,
+            };
+          case "getAlert": {
+            const alert = load(
+              store,
+              "alert",
+              params.alertId ?? "",
+              farmId,
+              c.Alert,
+            );
+            return alert.status === "active" &&
+              alert.valid_until &&
+              alert.valid_until < now()
+              ? {
+                  ...alert,
+                  status: "expired",
+                  freshness: { ...alert.freshness, status: "stale" },
+                }
+              : alert;
+          }
           case "acknowledgeAlert":
           case "dismissAlert": {
             const alert = load(
@@ -512,13 +888,18 @@ export function createDomainServices(
                 "validation",
                 "Only outcomes use this correction path",
               );
-            const updated = {
+            store.put("outcome_correction", {
+              ...base(farmId),
+              original_id: original.id,
+              original_summary: original.summary,
+              corrected_description: d.description,
+              effective_at: d.effective_at,
+            });
+            store.put("history", {
               ...original,
               version: original.version + 1,
-              summary: d.description,
               updated_at: now(),
-            };
-            store.put("history", updated);
+            });
             return history(
               farmId,
               "correction",

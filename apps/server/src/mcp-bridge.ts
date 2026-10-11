@@ -14,6 +14,15 @@ for (const [name, schema] of Object.entries(gatewaySchemas))
     {
       description: `Run-bound Sakha ${name}; principal and farm cannot be supplied`,
       inputSchema: schema.shape,
+      annotations: {
+        readOnlyHint: [
+          "read_farm_facts",
+          "lookup_evidence",
+          "recall_memory",
+        ].includes(name),
+        destructiveHint: false,
+        openWorldHint: false,
+      },
     },
     async (args: unknown) => {
       const validated = schema.parse(args);

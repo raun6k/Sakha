@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { refreshCoreEvidence } from "@sakha/data";
+import { importMarketQuote, refreshCoreEvidence } from "@sakha/data";
 import envPaths from "env-paths";
 import { createApp } from "./app.js";
 
@@ -42,9 +42,22 @@ try {
           location,
           join(paths.data, "source-artifacts"),
           {
-            months: arg ? Number(arg) : 12,
+            historicalDays: arg ? Number(arg) : 30,
             forecastDays: extra ? Number(extra) : 7,
           },
+        ),
+        null,
+        2,
+      ),
+    );
+  } else if (command === "market-import" && farmId && arg && extra) {
+    console.log(
+      JSON.stringify(
+        importMarketQuote(
+          dataServices,
+          farmId,
+          JSON.parse(readFileSync(arg, "utf8")),
+          readFileSync(extra),
         ),
         null,
         2,
@@ -74,7 +87,7 @@ try {
     );
   } else
     throw new Error(
-      "Usage: pnpm operator farms | refresh FARM_ID [MONTHS=12] [FORECAST_DAYS=7] | import FARM_ID CURATED_JSON [RAW_PDF]",
+      "Usage: pnpm operator farms | refresh FARM_ID [HISTORICAL_DAYS=30] [FORECAST_DAYS=7] | import FARM_ID CURATED_JSON RAW_PDF | market-import FARM_ID QUOTE_JSON RAW_SOURCE",
     );
 } finally {
   await app.close();

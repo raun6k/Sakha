@@ -63,6 +63,16 @@ function sdkDriver(
   }).strict();
   const tools = [
     tool({
+      name: "recall_memory",
+      description:
+        "Recall only this persistent role’s current authorized farm/field notes. Corrections invalidate derived memories.",
+      inputSchema: z.object({ query: z.string().min(1).max(1000) }).strict(),
+      callback: async (input) => {
+        check();
+        return JSON.stringify(await turn.tools.recallMemory(input.query));
+      },
+    }),
+    tool({
       name: "lookup_evidence",
       description:
         "Find actual saved public evidence permitted for this role and field; results retain freshness and provenance.",

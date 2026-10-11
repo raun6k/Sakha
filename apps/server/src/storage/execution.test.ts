@@ -116,3 +116,62 @@ it("recovers running leases as interrupted without retrying uncertain effects", 
   ).toBe("interrupted");
   await s.app.close();
 });
+it("rejects expired forecasts and wrong district evidence before publishing a finding", async () => {
+  for (const variant of ["expired", "wrong_district"]) {
+    const runtime: Runtime = {
+      getCapabilities: async () => ready,
+      cancelTurn: async () => {},
+      startTurn: async (turn) => {
+        const evidence = await turn.tools.lookupEvidence({ source_id: "W01" });
+        const item = evidence[0];
+        if (!item) throw new Error("Evidence absent");
+        await turn.tools.publishFinding({
+          title: "Bounded test",
+          summary: "Test finding",
+          evidence: [
+            {
+              source_id: item.source_id,
+              evidence_id: item.id,
+              snapshot_id: item.snapshot_id,
+            },
+          ],
+          assumptions: [],
+          missing_inputs: [],
+          constraints: [],
+          freshness: { status: "fresh" },
+        });
+        return { text: "Should never publish" };
+      },
+    };
+    const s = setup(runtime);
+    grant(s);
+    const profile = s.farm.assertFarm(s.farmId);
+    s.store.put("farm", {
+      ...profile,
+      location: { country: "India", district: "Nagpur" },
+    });
+    const evidence = c.Evidence.parse({
+      ...s.farm.makeBase(s.farmId),
+      source_id: "W01",
+      snapshot_id: "snapshot",
+      title: "Synthetic forecast fixture",
+      text: "Synthetic only",
+      retrieved_at: new Date().toISOString(),
+      valid_until:
+        variant === "expired" ? "1970-01-01T00:00:00Z" : "2099-01-01T00:00:00Z",
+      geography: variant === "expired" ? "Nagpur district" : "Wardha district",
+      kind: "forecast",
+      origin: "fixture",
+      hash: "synthetic",
+      method_version: "fixture",
+      citation: {},
+    });
+    s.store.put("evidence", evidence);
+    await s.execution.tick();
+    expect(
+      c.Run.parse(s.store.get("run", s.run.id, s.farmId)).failure?.code,
+    ).toBe(variant === "expired" ? "source_stale" : "scope_denied");
+    expect(s.store.list("finding", s.farmId)).toHaveLength(0);
+    await s.app.close();
+  }
+});

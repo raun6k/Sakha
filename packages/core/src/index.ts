@@ -5,7 +5,13 @@ import {
   isAuthorized,
 } from "@cedar-policy/cedar-wasm/nodejs";
 import * as c from "@sakha/contracts";
-import { DomainError, load, requireVersion, type Store } from "@sakha/farm";
+import {
+  assertMutationAllowed,
+  DomainError,
+  load,
+  requireVersion,
+  type Store,
+} from "@sakha/farm";
 export type BoundPrincipal = {
   kind: "farmer" | "agent";
   id: string;
@@ -91,6 +97,7 @@ export type RuntimeTurn = {
   beforeSend: () => Promise<void>;
   tools: {
     readFacts: () => Promise<c.Fact[]>;
+    recallMemory: (query: string) => Promise<{ text: string }[]>;
     lookupEvidence: (query: {
       source_id?: string;
       text?: string;
@@ -172,6 +179,8 @@ export function createCoreServices(
     ): unknown {
       return store.transaction(() => {
         const farmId = params.farmId ?? "";
+        if (c.operations[name].method !== "GET")
+          assertMutationAllowed(store, farmId);
         assertFarm(farmId);
         switch (name) {
           case "listConversations": {
