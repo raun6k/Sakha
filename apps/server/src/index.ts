@@ -22,7 +22,7 @@ const development = import.meta.url.endsWith(".ts");
 if (process.env.SAKHA_CODEX_ENABLED === "true")
   runtime = new CodexRuntime({
     enabled: true,
-    model: configured("SAKHA_CODEX_MODEL"),
+    model: configured("SAKHA_CODEX_MODEL") ?? "gpt-6-luna",
     bridgeEntrypoint: fileURLToPath(
       new URL(
         development ? "./mcp-bridge.ts" : "./mcp-bridge.js",
