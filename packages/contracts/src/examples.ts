@@ -275,7 +275,7 @@ const bootstrap = c.Bootstrap.parse({
   farms: [fixtureFarm],
   settings: fixtureSettings,
   capabilities: [],
-  supported_languages: ["en"],
+  supported_languages: ["en", "hi", "mr"],
   supported_units: ["ha", "acre", "mm", "m3", "kg", "INR"],
 });
 const paged = <T>(item: T) => ({ items: [item], next_cursor: null });

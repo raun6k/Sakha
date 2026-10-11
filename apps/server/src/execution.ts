@@ -18,6 +18,7 @@ import {
   planTurn,
   type Runtime,
   type RuntimeTurn,
+  readCardReply,
   registerHandoff,
   sakhaChatEnabled,
   sakhaReview,
@@ -76,6 +77,12 @@ export function createExecution(
   let stopped = false;
   const pendingJobs = new Set<Promise<void>>();
   const now = () => new Date().toISOString();
+  const farmerLanguage = (): "en" | "hi" | "mr" => {
+    const parsed = c.Settings.safeParse(
+      store.get("settings", "settings", "installation"),
+    );
+    return parsed.success ? parsed.data.language : "en";
+  };
   const state = (
     run: c.Run,
     next: c.Run["state"],
@@ -273,7 +280,9 @@ export function createExecution(
       });
       const hits = await (web.search ?? searchPublic)(question);
       remember(scratch, hits, canonical);
-      const card = sakhaReview(cardFromSources(canonical, question, hits)).card;
+      const card = sakhaReview(
+        cardFromSources(canonical, question, hits, now(), farmerLanguage()),
+      ).card;
       if (card.handoff_suggestion)
         registerHandoff(ledger, card.handoff_suggestion.to);
       scratch?.cards.push(card);
@@ -576,7 +585,9 @@ export function createExecution(
       { specialist: canonical },
     );
     const hits = await (web.search ?? searchPublic)(question);
-    const card = sakhaReview(cardFromSources(canonical, question, hits)).card;
+    const card = sakhaReview(
+      cardFromSources(canonical, question, hits, now(), farmerLanguage()),
+    ).card;
     return {
       specialist: canonical,
       notes: specialistNote(canonical, question, [], hits),
@@ -633,7 +644,13 @@ export function createExecution(
       if (plan.guard !== "farm") {
         const refusal = plan.refusal ?? "I only help with your farm.";
         const card = sakhaReview(
-          cardFromSources(run.role_key, farmerText || refusal, [], now()),
+          cardFromSources(
+            run.role_key,
+            farmerText || refusal,
+            [],
+            now(),
+            farmerLanguage(),
+          ),
         ).card;
         message = {
           ...message,
@@ -676,7 +693,8 @@ export function createExecution(
         run,
         messages,
         facts,
-        instructions: charterInstructions(run.role_key),
+        instructions: charterInstructions(run.role_key, farmerLanguage()),
+        language: farmerLanguage(),
         signal: controller.signal,
         tools: tools(run, (items) => {
           if (!message) return;
@@ -738,29 +756,46 @@ export function createExecution(
         },
       });
       if (current(run).state === "running" && message) {
+        const spoken = readCardReply(result.text);
+        const lang = farmerLanguage();
+        const applyFields = (card: c.TeamCard) => {
+          if (!spoken.fields) return card;
+          const parsed = c.TeamCard.safeParse({ ...card, ...spoken.fields });
+          return parsed.success ? parsed.data : card;
+        };
         if (run.role_key !== "sakha") {
           const reviewed = sakhaReview(
             cardFromSources(
               run.role_key,
-              result.text,
+              spoken.prose,
               scratch.citations,
               now(),
+              lang,
             ),
           );
-          scratch.cards.push(reviewed.card);
-          const handoff = reviewed.card.handoff_suggestion;
+          const reviewedCard = applyFields(reviewed.card);
+          scratch.cards.push(reviewedCard);
+          const handoff = reviewedCard.handoff_suggestion;
           if (handoff && scratch.ledger.calls === 0) {
             const extra = await consultAsLead(run, handoff.to, handoff.reason);
             remember(scratch, extra.citations, handoff.to);
             if (extra.card) scratch.cards.push(extra.card);
           }
         }
-        let text = ensureCited(result.text, scratch.citations);
-        const card = scratch.cards.length
-          ? mergeCards(scratch.cards)
-          : sakhaReview(
-              cardFromSources(run.role_key, text, scratch.citations, now()),
-            ).card;
+        let text = ensureCited(spoken.prose, scratch.citations);
+        const card = applyFields(
+          scratch.cards.length
+            ? mergeCards(scratch.cards)
+            : sakhaReview(
+                cardFromSources(
+                  run.role_key,
+                  text,
+                  scratch.citations,
+                  now(),
+                  lang,
+                ),
+              ).card,
+        );
         const names = scratch.specialists.map(
           (id) => specialistLabels[id as keyof typeof specialistLabels] ?? id,
         );

@@ -366,7 +366,7 @@ export function createFixtureService(
           farms: [farm],
           settings,
           capabilities: [],
-          supported_languages: ["en"],
+          supported_languages: ["en", "hi", "mr"],
           supported_units: ["ha", "acre", "mm", "kg", "INR"],
         };
       case "createFarm":

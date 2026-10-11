@@ -316,7 +316,7 @@ function sdkDriver(
     ? activeSpecialists.map((id) => {
         const teammate = new Agent({
           model,
-          systemPrompt: charterInstructions(id),
+          systemPrompt: charterInstructions(id, turn.language ?? "en"),
           tools: tools.filter((item) => {
             const name = "name" in item ? String(item.name) : "";
             return visible(id, name);

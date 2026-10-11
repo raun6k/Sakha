@@ -119,7 +119,7 @@ describe("team charter seed", () => {
     for (const thread of primaries) {
       const exchanges = thread.messages.length / 2;
       expect(exchanges).toBeGreaterThanOrEqual(3);
-      expect(exchanges).toBeLessThanOrEqual(5);
+      expect(exchanges).toBeLessThanOrEqual(6);
     }
     const consults = seed.threads.filter((thread) => thread.kind === "consult");
     expect(consults.length).toBeGreaterThanOrEqual(1);
@@ -169,6 +169,16 @@ describe("team charter seed", () => {
     ).toBe(true);
     const joke = replies.find((message) => message.card?.out_of_scope);
     expect(joke?.text).toMatch(/farm/);
+    const marathi = seed.threads
+      .find((thread) => thread.team_id === "paisa")
+      ?.messages.filter((message) => message.lang === "mr");
+    expect(marathi).toHaveLength(4);
+    expect(marathi?.[1]?.card?.headline).toContain("नागपूर");
+    expect(marathi?.[1]?.card?.why).toContain("काळजी");
+    expect(marathi?.[1]?.card?.cost_inr).toBe(cache.recommendation.cost_inr);
+    expect(marathi?.[3]?.card?.benefit_inr).toBe(
+      cache.recommendation.benefit_inr,
+    );
     expect(JSON.stringify(replies)).not.toMatch(/\bRONI\b/);
     expect(JSON.stringify(replies)).not.toMatch(/grid point/);
   });

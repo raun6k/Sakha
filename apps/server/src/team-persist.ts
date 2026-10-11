@@ -132,6 +132,7 @@ export function persistTeamSeed(
             reviewed_by: message.reviewed_by,
             card: message.card,
             lane_block: lane,
+            ...(message.lang ? { lang: message.lang } : {}),
           },
           team_id:
             message.author === "agent"
@@ -141,6 +142,7 @@ export function persistTeamSeed(
           consulted: message.consulted,
           card: message.card,
           lane_block: lane,
+          ...(message.lang ? { lang: message.lang } : {}),
           created_at: at,
           updated_at: at,
         }),

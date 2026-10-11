@@ -1,5 +1,6 @@
 import type { TeamCard, WebCitation } from "@sakha/contracts";
 import * as c from "@sakha/contracts";
+import { z } from "zod";
 
 /** Team lead. The farmer can also open a teammate directly. */
 export const sakhaRole = "sakha" as const;
@@ -64,20 +65,31 @@ const sharedRules = [
   "Unknown rupees stay unknown. Do not approve a plan, save a farmer fact, record completed work, pay, or submit a form.",
 ].join(" ");
 
-export function sakhaInstructions(): string {
+export type FarmerLanguage = "en" | "hi" | "mr";
+
+export function languageDirective(lang: FarmerLanguage = "en"): string {
+  const name = lang === "mr" ? "Marathi" : lang === "hi" ? "Hindi" : "English";
+  return `The farmer's language is ${name}. Write every farmer-facing sentence, and every Card field (headline, do, why, and any handoff reason), in ${name}. Keep rupee figures, millimetres, and source names as figures. End the reply with one JSON object and nothing after it: {"headline":"...","do":["..."],"why":"..."}. Those three fields must be in ${name}.`;
+}
+
+export function sakhaInstructions(lang: FarmerLanguage = "en"): string {
   return [
     "You are Sakha, the farm team lead. You listen, assign Megha (weather and El Niño), Jal (water), Kheti (crops and soil), or Paisa (money, mandi, schemes), then review their Cards into one plan.",
     "You do not invent weather, irrigation amounts, agronomy, or prices. Call consult_megha, consult_jal, consult_kheti, or consult_paisa. For a daily brief, call daily_brief once so all four run together.",
     "Simple questions use one teammate. Mixed questions use at most two in parallel. A second round happens only when a Card names a teammate you have not called. Stop at 2 rounds, 3 teammate calls, and 1 revision. Never ask two teammates to call each other.",
-    "Answer in the farmer's language, Hindi or English, in at most 120 words. Shape: headline, do this, why, cost in rupees only when a source gave a number, benefit in rupees only when a source gave a number, source.",
+    "Answer in at most 120 words. Shape: headline, do this, why, cost in rupees only when a source gave a number, benefit in rupees only when a source gave a number, source.",
+    languageDirective(lang),
     "Off-topic requests get one polite line about weather, water, crops, and money. Unsafe pesticide or self-harm requests get a refusal and Kisan Call Centre 1800-180-1551.",
     sharedRules,
   ].join(" ");
 }
 
-export function charterInstructions(role: c.RoleKey): string {
+export function charterInstructions(
+  role: c.RoleKey,
+  lang: FarmerLanguage = "en",
+): string {
   const lanes: Record<c.RoleKey, string> = {
-    sakha: sakhaInstructions(),
+    sakha: sakhaInstructions(lang),
     megha:
       "You are Megha, the weather and monsoon watcher. Forecast, heat, spray windows, ENSO, and whether to wait for rain are in lane. Call openmeteo_forecast and noaa_enso_status before you state a number. Water quantity is Jal. Variety choice is Kheti. Insurance is Paisa. Memory keys: megha.last_forecast, megha.enso_state, megha.season_rain_mm, megha.alerts_sent.",
     jal: "You are Jal, the water manager. Call irrigate_or_wait for the rain-versus-evaporation decision. Do not invent millimetres, pump hours, or rupee costs. Forecasts are Megha. Subsidies are Paisa. Disease is Kheti. Memory keys: jal.water_source, jal.pump_hp, jal.last_irrigation_date, jal.method, jal.irrigation_log.",
@@ -86,7 +98,7 @@ export function charterInstructions(role: c.RoleKey): string {
     paisa:
       "You are Paisa, the money and market advisor. Call agmarknet_prices and msp_table before you state a rupee amount. Mandi, MSP, costs, and public schemes (PM-KISAN, PMFBY, PMKSY, KCC) are in lane. Never invent a price or a scheme amount. Never ask for bank or Aadhaar details. Never promise a payment. Agronomy is Kheti. Weather is Megha. Water quantity is Jal. Memory keys: paisa.nearest_mandis, paisa.price_history, paisa.enrolled_schemes, paisa.costs_this_season, paisa.stored_qty_qtl.",
   };
-  return `${lanes[role]} ${sharedRules}`;
+  return `${lanes[role]} ${languageDirective(lang)} ${sharedRules}`;
 }
 
 export type PromptRoute = {
@@ -432,22 +444,69 @@ export function suggestHandoff(
   return undefined;
 }
 
+const cardPhrases: Record<
+  FarmerLanguage,
+  { do: string; unsure: string; none: string; cached: string }
+> = {
+  en: {
+    do: "Read the cited source before you change water, seed, or a sale.",
+    unsure: "I am not sure. No dated source was retrieved.",
+    none: "No dated source was retrieved",
+    cached: "Cached on",
+  },
+  hi: {
+    do: "पानी, बीज या बिक्री बदलने से पहले दिए गए स्रोत को पढ़ें।",
+    unsure: "पक्का नहीं। कोई दिनांक वाला स्रोत नहीं मिला।",
+    none: "कोई दिनांक वाला स्रोत नहीं मिला",
+    cached: "सहेजा गया",
+  },
+  mr: {
+    do: "पाणी, बियाणे किंवा विक्री बदलण्यापूर्वी दिलेला स्रोत वाचा.",
+    unsure: "खात्री नाही. दिनांक असलेला स्रोत मिळाला नाही.",
+    none: "दिनांक असलेला स्रोत मिळाला नाही",
+    cached: "साठवले",
+  },
+};
+
+export function readCardReply(text: string): {
+  prose: string;
+  fields?: { headline: string; do: string[]; why: string };
+} {
+  const match = text.match(/\n\{[\s\S]*\}\s*$/);
+  if (!match || match.index === undefined) return { prose: text };
+  try {
+    const fields = z
+      .object({
+        headline: z.string().min(1).max(200),
+        do: z.array(z.string().min(1)).min(1).max(3),
+        why: z.string().min(1).max(800),
+      })
+      .parse(JSON.parse(match[0]));
+    const prose = text.slice(0, match.index).trim();
+    return { prose: prose || fields.headline, fields };
+  } catch {
+    return { prose: text };
+  }
+}
+
 export function cardFromSources(
   agent: c.RoleKey,
   question: string,
   citations: c.WebCitation[],
   now = new Date().toISOString(),
+  lang: FarmerLanguage = "en",
 ): TeamCard {
+  const phrases = cardPhrases[lang];
   const cached = citations.some((item) => item.source === "cache");
   const first = citations[0];
   const why = first
-    ? `${first.snippet}${cached ? ` Cached on ${first.fetched_at}.` : ""}`
-    : "I am not sure. No dated source was retrieved.";
+    ? `${first.snippet}${cached ? ` ${phrases.cached} ${first.fetched_at}.` : ""}`
+    : phrases.unsure;
   const handoff = suggestHandoff(agent, question);
   return c.TeamCard.parse({
     agent,
     headline: words(question || "Farm check", 12),
-    do: ["Read the cited source before you change water, seed, or a sale."],
+    do: [phrases.do],
     why: words(why, 80),
     risk: "medium",
     confidence: cached || !first ? "low" : "medium",
@@ -460,7 +519,7 @@ export function cardFromSources(
         }))
       : [
           {
-            title: "No dated source was retrieved",
+            title: phrases.none,
             adapter: "none",
             fetched_at: now,
           },

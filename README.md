@@ -103,5 +103,5 @@ pnpm test:browser
 
 - Team pattern and optional model path: [Strands Agents](https://strandsagents.com/). Policy checks: [Cedar](https://www.cedarpolicy.com/) (`policies/sakha-v1.cedar`).
 - Weather, climate and prices: Open-Meteo (CC BY 4.0), NOAA CPC (US public data), NASA POWER, data.gov.in / Agmarknet, and the Press Information Bureau. Cache notes live in `packages/data/cache/`.
-- UI type: [Noto Sans and Noto Sans Devanagari](https://fonts.google.com/noto) (SIL Open Font License), shipped under `apps/web/public/fonts/`.
+- UI type: [Fraunces](https://fonts.google.com/specimen/Fraunces) for large Latin headlines, [Plus Jakarta Sans](https://fonts.google.com/specimen/Plus+Jakarta+Sans) for the UI, and [Mukta](https://fonts.google.com/specimen/Mukta) for Hindi and Marathi (SIL Open Font License), self-hosted with `@fontsource`.
 - App libraries include React, Vite, Fastify, better-sqlite3, Zod, Radix, and Lucide. See the lockfile for versions.

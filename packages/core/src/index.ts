@@ -147,6 +147,8 @@ export type RuntimeTurn = {
   messages: c.Message[];
   facts: c.Fact[];
   instructions: string;
+  /** Farmer language for this turn. Card fields must use it. */
+  language?: "en" | "hi" | "mr";
   signal: AbortSignal;
   onText: (text: string) => Promise<void>;
   beforeSend: () => Promise<void>;
@@ -193,14 +195,17 @@ export {
   cardFromSources,
   charterInstructions,
   ensureCited,
+  type FarmerLanguage,
   farmerFacingChecks,
   isActiveSpecialist,
+  languageDirective,
   MAX_HOPS,
   MAX_REVISIONS,
   MAX_SPECIALIST_CALLS,
   mergeCards,
   type PromptRoute,
   planTurn,
+  readCardReply,
   registerHandoff,
   routeFarmerPrompt,
   sakhaChatEnabled,

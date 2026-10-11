@@ -6,7 +6,7 @@ import { MoneyFigures } from "../components/money-figures";
 import { SourceBadge } from "../components/source-badge";
 import { ErrorNotice, State } from "../components/ui";
 import { t } from "../copy";
-import { plainSentence } from "../farmer";
+import { plainSentence, shownLine } from "../farmer";
 import { useLang } from "../language";
 import { useCommand, useFarmId, useRead } from "../services/context";
 import { teammateName } from "../team/adapter";
@@ -31,8 +31,18 @@ function Steps({ revision }: { revision: PlanRevision }) {
             {stepIcon(task.title)}
           </span>
           <div>
-            <strong>{plainSentence(task.title, t(lang, "whyFallback"))}</strong>
-            <p>{plainSentence(task.description, t(lang, "whyFallback"))}</p>
+            <strong>
+              {shownLine(
+                plainSentence(task.title, t(lang, "whyFallback")),
+                lang,
+              )}
+            </strong>
+            <p>
+              {shownLine(
+                plainSentence(task.description, t(lang, "whyFallback")),
+                lang,
+              )}
+            </p>
           </div>
         </li>
       ))}

@@ -60,7 +60,7 @@ export function HomePage() {
   const facts = home.sections.context;
   const risk = buildRisk(home);
   const advice = cardFromHome(home, lang);
-  const team = applyRemoteTeam(buildTeam(home, lang), remote.data);
+  const team = applyRemoteTeam(buildTeam(home, lang), remote.data, lang);
   const rain = pickRainSeries(home.insights.series);
   const crop = factText(latestFact(facts, "current_crop"), lang);
   const cropShown = crop === t(lang, "notAdded") ? undefined : crop;
@@ -107,9 +107,9 @@ export function HomePage() {
           <Mic size={26} />
         </span>
         <span>
-          {lang === "hi" ? t(lang, "askSakhaHindi") : t(lang, "askSakha")}
+          {t(lang, "askSakha")}
           <small>
-            {lang === "hi" ? "Ask Sakha" : t(lang, "askSakhaHindi")}
+            {lang === "en" ? t(lang, "askSakhaHindi") : "Ask Sakha"}
           </small>
         </span>
       </Link>

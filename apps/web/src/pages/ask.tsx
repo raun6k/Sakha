@@ -259,7 +259,8 @@ export function Thread({
   const speak = () => {
     const recognizer = speechRecognizer();
     if (!recognizer) return;
-    recognizer.lang = lang === "hi" ? "hi-IN" : "en-IN";
+    recognizer.lang =
+      lang === "hi" ? "hi-IN" : lang === "mr" ? "mr-IN" : "en-IN";
     recognizer.interimResults = false;
     recognizer.onresult = (event) => {
       const heard = event.results[0]?.[0]?.transcript;
@@ -269,11 +270,20 @@ export function Thread({
     recognizer.start();
   };
   const voiceReady = speechRecognizer() !== undefined;
-  const history =
+  const tagged = (message: { lang?: string; context?: { lang?: string } }) =>
+    message.context?.lang ?? message.lang;
+  const spoken =
     messages.data?.items.filter(
       (message) =>
         message.author === "farmer" || message.text.trim().length > 0,
     ) ?? [];
+  const inThisLanguage = spoken.filter((message) => tagged(message) === lang);
+  const history = inThisLanguage.length
+    ? inThisLanguage
+    : spoken.filter((message) => {
+        const messageLang = tagged(message);
+        return !messageLang || messageLang === "en";
+      });
   const body = (
     <>
       {!ready && history.length === 0 ? (

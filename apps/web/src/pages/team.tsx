@@ -52,7 +52,7 @@ export function TeamPage() {
         </State>
       </div>
     );
-  const roster = applyRemoteTeam(buildTeam(home.data, lang), remote.data);
+  const roster = applyRemoteTeam(buildTeam(home.data, lang), remote.data, lang);
   const team = roster.filter((item) => item.id !== "sakha");
   const current = roster.find((item) => item.id === mate);
   if (mate !== "sakha")

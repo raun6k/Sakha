@@ -264,7 +264,7 @@ export function createApp(options: {
               ).map((row) => c.Farm.parse(JSON.parse(row.payload))),
               settings: farm.execute("getSettings", {}, {}),
               capabilities: roleDirectory()[0]?.capabilities ?? [],
-              supported_languages: ["en"],
+              supported_languages: ["en", "hi", "mr"],
               supported_units: ["ha", "acre", "mm", "m3", "kg", "INR"],
             });
           if (name === "listAgents") return roleProjection(params.farmId);

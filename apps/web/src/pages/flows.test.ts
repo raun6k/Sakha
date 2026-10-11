@@ -167,7 +167,7 @@ describe("home, team and rain", () => {
     expect(screen.getByRole("link", { name: "My Plan" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "My Farm" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Agents" })).toBeNull();
-    await user.click(screen.getByRole("button", { name: "हिन्दी" }));
+    await user.click(screen.getByRole("button", { name: "हिंदी" }));
     expect(screen.getByRole("link", { name: "होम" })).toBeTruthy();
   });
   it("labels a small rain axis in millimetres", () => {

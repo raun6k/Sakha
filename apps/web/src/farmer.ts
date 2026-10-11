@@ -2,6 +2,49 @@ import type { Fact, Home, Plan, Series } from "@sakha/contracts";
 import { sourceLabel, t } from "./copy";
 import type { Lang } from "./language";
 
+export function localeOf(lang: Lang) {
+  if (lang === "hi") return "hi-IN";
+  if (lang === "mr") return "mr-IN";
+  return "en-IN";
+}
+
+/** Show the seeded plan lines in the farmer's language. Numbers stay as stored. */
+export function shownLine(text: string, lang: Lang) {
+  if (lang === "en") return text;
+  const hi = lang === "hi";
+  let match = text.match(/^Cut ([\d.]+) ha soybean$/);
+  if (match)
+    return hi
+      ? `${match[1]} हेक्टेयर सोयाबीन काटें`
+      : `${match[1]} हेक्टर सोयाबीन कापा`;
+  match = text.match(/^Sell at (.+)$/);
+  if (match) return hi ? `${match[1]} पर बेचें` : `${match[1]} येथे विका`;
+  if (text === "Keep the borewell for cotton")
+    return hi ? "कपास के लिए बोरवेल रखें" : "कापसासाठी बोअर ठेवा";
+  match = text.match(
+    /^Cut between (.+) while the forecast shows ([\d.]+) mm of rain\.$/,
+  );
+  if (match)
+    return hi
+      ? `${match[1]} के बीच काटें। पूर्वानुमान में ${match[2]} मिमी बारिश है।`
+      : `${match[1]} दरम्यान कापा. अंदाजात ${match[2]} मिमी पाऊस आहे.`;
+  match = text.match(
+    /^Aim for ₹([\d,]+) per quintal, not the ₹([\d,]+) minimum\. The quote is cached (.+)\.$/,
+  );
+  if (match)
+    return hi
+      ? `₹${match[1]} प्रति क्विंटल माँगें, ₹${match[2]} न्यूनतम नहीं। भाव ${match[3]} का सहेजा हुआ है।`
+      : `₹${match[1]} प्रति क्विंटल विचारा, ₹${match[2]} किमान नाही. भाव ${match[3]} रोजी साठवलेला आहे.`;
+  match = text.match(
+    /^Give the soybean 0 mm\. About ([\d,]+) m3 stays unpumped for the ([\d.]+) ha cotton\.$/,
+  );
+  if (match)
+    return hi
+      ? `सोयाबीन को 0 मिमी दें। लगभग ${match[1]} घन मीटर ${match[2]} हेक्टेयर कपास के लिए बचा है।`
+      : `सोयाबीनला 0 मिमी द्या. सुमारे ${match[1]} घनमीटर ${match[2]} हेक्टर कापसासाठी राखून ठेवा.`;
+  return text;
+}
+
 const jargon =
   /synthetic|demonstration|illustrative|agronomic|fixture|\bruntime\b|orchestrat|\bagents?\b|grid|RONI|ENSO|CHIRPS|Niño|Nino|demo farmer|command center|farm context/i;
 
@@ -87,7 +130,7 @@ export function factText(value: Fact["value"] | undefined, lang: Lang): string {
   }
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if ("minor_units" in value)
-    return new Intl.NumberFormat(lang === "hi" ? "hi-IN" : "en-IN", {
+    return new Intl.NumberFormat(localeOf(lang), {
       style: "currency",
       currency: value.currency,
       maximumFractionDigits: 0,
@@ -288,7 +331,7 @@ export function formatUpdated(iso: string | undefined, lang: Lang) {
   if (!iso) return t(lang, "timeUnknown");
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return t(lang, "timeUnknown");
-  return date.toLocaleString(lang === "hi" ? "hi-IN" : "en-IN", {
+  return date.toLocaleString(localeOf(lang), {
     day: "numeric",
     month: "short",
     hour: "numeric",
@@ -306,7 +349,7 @@ export function greeting(hour: number, lang: Lang) {
 export function dayLabel(iso: string, lang: Lang) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString(lang === "hi" ? "hi-IN" : "en-IN", {
+  return date.toLocaleDateString(localeOf(lang), {
     day: "numeric",
     timeZone: "Asia/Kolkata",
   });

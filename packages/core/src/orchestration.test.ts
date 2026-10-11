@@ -3,9 +3,11 @@ import {
   admitConsult,
   beginLedger,
   cardFromSources,
+  charterInstructions,
   farmerFacingChecks,
   mergeCards,
   planTurn,
+  readCardReply,
   registerHandoff,
   sakhaChatEnabled,
   sakhaReview,
@@ -166,6 +168,27 @@ it("labels cached sources and does not invent a rupee amount", () => {
   expect(merged.agent).toBe("sakha");
   expect(merged.why.toLowerCase()).toContain("wait");
   expect(merged.consulted).toEqual(["megha", "jal"]);
+});
+
+it("writes Marathi card fields when that is the farmer's language", () => {
+  expect(charterInstructions("paisa", "mr")).toMatch(/Marathi/);
+  expect(charterInstructions("paisa", "mr")).toMatch(/"headline"/);
+  const card = cardFromSources(
+    "paisa",
+    "सोयाबीन विकू का?",
+    [],
+    "2026-10-11T00:00:00Z",
+    "mr",
+  );
+  expect(card.headline).toContain("सोयाबीन");
+  expect(card.do[0]).toMatch(/स्रोत/);
+  expect(card.why).toMatch(/खात्री/);
+  const reply = readCardReply(
+    'नागपूरला विका.\n{"headline":"नागपूरला विका","do":["₹6,175 विचारा"],"why":"काळजी ठेवा. भाव साठवलेला आहे."}',
+  );
+  expect(reply.fields?.headline).toBe("नागपूरला विका");
+  expect(reply.fields?.why).toContain("काळजी");
+  expect(reply.prose).toBe("नागपूरला विका.");
 });
 
 it("treats one conversation grant as the team toggle", () => {

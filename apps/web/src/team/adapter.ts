@@ -7,6 +7,7 @@ import {
   pickRainSeries,
   plainSentence,
   rainTotal,
+  shownLine,
 } from "../farmer";
 import type { Lang } from "../language";
 
@@ -70,8 +71,10 @@ const charter: Record<
   {
     en: string;
     hi: string;
+    mr: string;
     roleEn: string;
     roleHi: string;
+    roleMr: string;
     color: string;
     accent?: string;
   }
@@ -79,45 +82,61 @@ const charter: Record<
   sakha: {
     en: "Sakha",
     hi: "साखा",
+    mr: "साखा",
     roleEn:
       "Your farm team lead; listens, assigns, checks and gives one clear plan.",
     roleHi: "आपकी खेत टीम के मुखिया; सुनते हैं, काम बाँटते हैं, जाँचते हैं और एक योजना देते हैं।",
+    roleMr: "तुमच्या शेत टीमचे प्रमुख. ऐकतात, काम वाटतात, तपासतात आणि एक योजना देतात.",
     color: "#1F6F43",
   },
   megha: {
     en: "Megha",
     hi: "मेघा",
+    mr: "मेघा",
     roleEn: "Your weather and monsoon watcher",
     roleHi: "मौसम और मानसून देखती हैं",
+    roleMr: "हवामान आणि पावसाळा पाहते",
     color: "#2B7BB9",
     accent: "#F2A93B",
   },
   jal: {
     en: "Jal",
     hi: "जल",
+    mr: "जल",
     roleEn: "Your water manager",
     roleHi: "पानी संभालते हैं",
+    roleMr: "पाणी सांभाळतात",
     color: "#5BA8D6",
   },
   kheti: {
     en: "Kheti",
     hi: "खेती",
+    mr: "शेती",
     roleEn: "Your crop doctor and agronomist.",
     roleHi: "आपकी फसल डॉक्टर और कृषि सलाहकार।",
+    roleMr: "तुमच्या पिकाचे डॉक्टर.",
     color: "#8B5E3C",
     accent: "#1F6F43",
   },
   paisa: {
     en: "Paisa",
     hi: "पैसा",
+    mr: "पैसा",
     roleEn: "Your money and market advisor",
     roleHi: "पैसा और मंडी की सलाह",
+    roleMr: "पैसा आणि मंडईचा सल्ला",
     color: "#F2A93B",
   },
 };
 
+function say(lang: Lang, en: string, hi: string, mr: string) {
+  if (lang === "hi") return hi;
+  if (lang === "mr") return mr;
+  return en;
+}
+
 export function teammateName(id: TeamId, lang: Lang) {
-  return charter[id][lang === "hi" ? "hi" : "en"];
+  return say(lang, charter[id].en, charter[id].hi, charter[id].mr);
 }
 
 export function isTeamId(value: string): value is TeamId {
@@ -131,10 +150,11 @@ function mmText(value: number | undefined) {
 }
 
 function ensoLabel(anomaly: number | undefined, lang: Lang) {
-  if (anomaly === undefined) return lang === "hi" ? "पता नहीं" : "not in yet";
-  if (anomaly >= 0.5) return lang === "hi" ? "अल नीनो" : "El Niño";
-  if (anomaly <= -0.5) return lang === "hi" ? "ला नीना" : "La Niña";
-  return lang === "hi" ? "सामान्य" : "neutral";
+  if (anomaly === undefined)
+    return say(lang, "not in yet", "पता नहीं", "अजून नाही");
+  if (anomaly >= 0.5) return say(lang, "El Niño", "अल नीनो", "एल निनो");
+  if (anomaly <= -0.5) return say(lang, "La Niña", "ला नीना", "ला निना");
+  return say(lang, "neutral", "सामान्य", "सामान्य");
 }
 
 function cropName(home: Home, lang: Lang) {
@@ -148,7 +168,14 @@ function cropName(home: Home, lang: Lang) {
     lang,
   );
   if (next !== t(lang, "notAdded")) return next;
-  return lang === "hi" ? "फसल" : "crop";
+  return say(lang, "crop", "फसल", "पीक");
+}
+
+function cropWord(name: string, lang: Lang) {
+  if (lang === "en") return name;
+  return name
+    .replace(/soybean/gi, "सोयाबीन")
+    .replace(/cotton/gi, lang === "hi" ? "कपास" : "कापूस");
 }
 
 export function buildTeam(home: Home | undefined, lang: Lang): TeammateView[] {
@@ -163,23 +190,25 @@ export function buildTeam(home: Home | undefined, lang: Lang): TeammateView[] {
       `${home?.sections.weather.at(-1)?.title ?? ""} ${home?.sections.weather.at(-1)?.summary ?? ""}`,
     );
   const alert = dry
-    ? lang === "hi"
-      ? "सूखा हफ्ता"
-      : "dry week"
-    : lang === "hi"
-      ? "कोई चेतावनी नहीं"
-      : "no alerts";
+    ? say(lang, "dry week", "सूखा हफ्ता", "कोरडा आठवडा")
+    : say(lang, "no alerts", "कोई चेतावनी नहीं", "इशारा नाही");
   const enso = ensoLabel(home ? anomaly : undefined, lang);
   const tasks =
     home?.sections.plan.active_revision?.tasks ??
     home?.sections.plan.proposed_revisions[0]?.tasks ??
     [];
   const open = tasks.filter((task) => task.status !== "cancelled");
-  const top = plainSentence(
-    open[0]?.title,
-    lang === "hi" ? "टीम से पूछें" : "ask the team",
+  const top = shownLine(
+    plainSentence(
+      open[0]?.title,
+      say(lang, "ask the team", "टीम से पूछें", "टीमला विचारा"),
+    ),
+    lang,
   );
-  const crop = home ? cropName(home, lang) : lang === "hi" ? "फसल" : "crop";
+  const crop = cropWord(
+    home ? cropName(home, lang) : say(lang, "crop", "फसल", "पीक"),
+    lang,
+  );
   const stageRaw = home
     ? factText(latestFact(home.sections.context, "crop_stage"), lang)
     : t(lang, "notAdded");
@@ -191,53 +220,62 @@ export function buildTeam(home: Home | undefined, lang: Lang): TeammateView[] {
       : stageRaw;
   const stageText =
     stage === t(lang, "notAdded")
-      ? lang === "hi"
-        ? "अवस्था पता नहीं"
-        : "stage not noted"
-      : stage;
+      ? say(lang, "stage not noted", "अवस्था पता नहीं", "अवस्था माहीत नाही")
+      : /pods drying/i.test(stage)
+        ? say(lang, stage, "फलियाँ सूख रही हैं", "शेंगा सुकत आहेत")
+        : stage;
   const nextWater =
     rainMm !== undefined && rainMm >= 10
-      ? lang === "hi"
-        ? "अभी ज़रूरत नहीं"
-        : "not needed"
-      : lang === "hi"
-        ? "जल्द पूछें"
-        : "soon";
+      ? say(lang, "not needed", "अभी ज़रूरत नहीं", "आता गरज नाही")
+      : say(lang, "soon", "जल्द पूछें", "लवकर विचारा");
 
   const rainLabel = mmText(rainMm);
   const ensoText =
     anomaly === undefined
-      ? lang === "hi"
-        ? "मानसून का आंकड़ा आ रहा है"
-        : "monsoon reading is on the way"
+      ? say(
+          lang,
+          "monsoon reading is on the way",
+          "मानसून का आंकड़ा आ रहा है",
+          "पावसाळ्याचा आकडा येतोय",
+        )
       : `${enso} ${anomaly > 0 ? "+" : ""}${anomaly} °C`;
   const status: Record<TeamId, string> = {
-    sakha:
-      lang === "hi"
-        ? `${open.length} काम इस हफ्ते · पहला: ${top}`
-        : `${open.length} actions this week · top: ${top}`,
-    megha:
-      lang === "hi"
-        ? `🌧 अगले 7 दिन ${rainLabel ?? "का आंकड़ा"} मिमी · ${ensoText} · ${alert}`
-        : `🌧 ${rainLabel ?? "upcoming"} mm next 7 days · ${ensoText} · ${alert}`,
-    jal:
-      lang === "hi"
-        ? `💧 इंतज़ार · अगला पानी: ${nextWater}`
-        : `💧 Wait · next water: ${nextWater}`,
-    kheti:
-      lang === "hi"
-        ? `🌱 ${crop} · ${stageText} · ध्यान: खेत की जाँच`
-        : `🌱 ${crop} · ${stageText} · watch: field check`,
-    paisa:
-      lang === "hi"
-        ? `₹ ${crop} का मंडी भाव और एमएसपी टीम की पट्टी पर`
-        : `₹ ${crop} mandi price and MSP are on the team strip`,
+    sakha: say(
+      lang,
+      `${open.length} actions this week · top: ${top}`,
+      `${open.length} काम इस हफ्ते · पहला: ${top}`,
+      `${open.length} कामे या आठवड्यात · पहिले: ${top}`,
+    ),
+    megha: say(
+      lang,
+      `🌧 ${rainLabel ?? "upcoming"} mm next 7 days · ${ensoText} · ${alert}`,
+      `🌧 अगले 7 दिन ${rainLabel ?? "का आंकड़ा"} मिमी · ${ensoText} · ${alert}`,
+      `🌧 पुढचे 7 दिवस ${rainLabel ?? "अजून"} मिमी · ${ensoText} · ${alert}`,
+    ),
+    jal: say(
+      lang,
+      `💧 Wait · next water: ${nextWater}`,
+      `💧 इंतज़ार · अगला पानी: ${nextWater}`,
+      `💧 थांबा · पुढचे पाणी: ${nextWater}`,
+    ),
+    kheti: say(
+      lang,
+      `🌱 ${crop} · ${stageText} · watch: field check`,
+      `🌱 ${crop} · ${stageText} · ध्यान: खेत की जाँच`,
+      `🌱 ${crop} · ${stageText} · लक्ष: शेत तपासा`,
+    ),
+    paisa: say(
+      lang,
+      `₹ ${crop} mandi price and MSP are on the team strip`,
+      `₹ ${crop} का मंडी भाव और एमएसपी टीम की पट्टी पर`,
+      `₹ ${crop}चा मंडईभाव आणि MSP टीमच्या पट्ट्यावर`,
+    ),
   };
 
   return teamIds.map((id) => ({
     id,
     name: teammateName(id, lang),
-    role: lang === "hi" ? charter[id].roleHi : charter[id].roleEn,
+    role: say(lang, charter[id].roleEn, charter[id].roleHi, charter[id].roleMr),
     status: status[id],
     color: charter[id].color,
     accent: charter[id].accent,
@@ -255,11 +293,13 @@ export function applyRemoteTeam(
     status_line: string;
     color: string;
   }[],
+  lang: Lang = "en",
 ): TeammateView[] {
   if (!remote?.length) return local;
   return local.map((mate) => {
     const next = remote.find((item) => item.id === mate.id);
     if (!next) return mate;
+    if (lang !== "en") return { ...mate, color: next.color || mate.color };
     return {
       ...mate,
       name: next.name || mate.name,
@@ -502,13 +542,19 @@ export function cardFromHome(home: Home, lang: Lang): FarmerCard {
   const tasks = (revision?.tasks ?? [])
     .filter((task) => task.status !== "cancelled")
     .slice(0, 3);
-  const action = plainSentence(
-    tasks[0]?.title,
-    plainSentence(revision?.title, t(lang, "askWhatToDo")),
+  const action = shownLine(
+    plainSentence(
+      tasks[0]?.title,
+      plainSentence(revision?.title, t(lang, "askWhatToDo")),
+    ),
+    lang,
   );
-  const why = plainSentence(
-    tasks[0]?.description,
-    plainSentence(revision?.summary, t(lang, "whyEmpty")),
+  const why = shownLine(
+    plainSentence(
+      tasks[0]?.description,
+      plainSentence(revision?.summary, t(lang, "whyEmpty")),
+    ),
+    lang,
   );
   const consulted = teamIds.filter((id) => {
     if (id === "sakha") return false;
@@ -588,11 +634,14 @@ export function rupeeText(
   lang: Lang,
 ) {
   const format = (amount: number) =>
-    new Intl.NumberFormat(lang === "hi" ? "hi-IN" : "en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(amount);
+    new Intl.NumberFormat(
+      lang === "hi" ? "hi-IN" : lang === "mr" ? "mr-IN" : "en-IN",
+      {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 0,
+      },
+    ).format(amount);
   if (low !== undefined && high !== undefined)
     return `${format(low)}–${format(high)}`;
   if (value !== undefined) return format(value);

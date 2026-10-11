@@ -134,7 +134,7 @@ export const Fact = RecordBase.extend({
 });
 export const Settings = z.object({
   version: z.number().int().positive(),
-  language: z.literal("en"),
+  language: z.enum(["en", "hi", "mr"]),
   area_unit: z.enum(["ha", "acre"]),
   temperature_unit: z.enum(["celsius", "fahrenheit"]),
   currency: z.literal("INR"),
@@ -294,12 +294,15 @@ export const Message = RecordBase.extend({
     reviewed_by: z.literal("sakha").optional(),
     card: TeamCard.optional(),
     lane_block: LaneBlock.optional(),
+    /** Farmer language this turn was written in. Older rows omit it. */
+    lang: z.enum(["en", "hi", "mr"]).optional(),
   }),
   team_id: AgentId.optional(),
   reviewed_by: AgentId.optional(),
   consulted: z.array(AgentId).optional(),
   card: Card.optional(),
   lane_block: LaneBlock.optional(),
+  lang: z.enum(["en", "hi", "mr"]).optional(),
 });
 export const Conversation = RecordBase.extend({
   role_key: RoleKey,
@@ -597,7 +600,7 @@ export const Bootstrap = z.object({
   farms: z.array(Farm),
   settings: Settings,
   capabilities: z.array(Capability),
-  supported_languages: z.array(z.literal("en")),
+  supported_languages: z.array(z.enum(["en", "hi", "mr"])),
   supported_units: z.array(z.string()),
 });
 export const ApiError = z.object({

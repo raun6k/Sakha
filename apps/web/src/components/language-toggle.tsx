@@ -17,7 +17,14 @@ export function LanguageToggle() {
         aria-pressed={lang === "hi"}
         onClick={() => setLang("hi")}
       >
-        हिन्दी
+        हिंदी
+      </button>
+      <button
+        type="button"
+        aria-pressed={lang === "mr"}
+        onClick={() => setLang("mr")}
+      >
+        मराठी
       </button>
     </fieldset>
   );

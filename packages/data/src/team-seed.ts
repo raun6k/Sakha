@@ -45,6 +45,7 @@ export type SeedMessage = {
     allowed_role: AgentId;
     action: string;
   };
+  lang?: "en" | "hi" | "mr";
 };
 
 export type SeedThread = {
@@ -133,10 +134,11 @@ function pair(
     consulted?: AgentId[];
     hindi?: string;
     lane_check?: SeedMessage["lane_check"];
+    lang?: SeedMessage["lang"];
   },
 ): SeedMessage[] {
   return [
-    { author: "farmer", text: question },
+    { author: "farmer", text: question, lang: extra?.lang },
     {
       author: "agent",
       text: say(value, extra?.hindi),
@@ -144,6 +146,7 @@ function pair(
       consulted: extra?.consulted,
       card: value,
       lane_check: extra?.lane_check,
+      lang: extra?.lang,
     },
   ];
 }
@@ -552,6 +555,38 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
     sources: [farmerSource, marketSource, mspSource],
     prices,
   });
+  const sellMarathi = card({
+    agent: "paisa",
+    headline: "नागपूर मंडईच्या मोडलला विका",
+    do: [
+      `नागपूर APMC ला ₹${rupee(brief.modal_inr)} प्रति क्विंटल विचारा, ₹${rupee(brief.min_inr)} किमान नाही.`,
+      `काटोल आणि सावनेरचे भाव त्याच पत्रकावर आहेत. भाव ${pretty(brief.price_date)} रोजी साठवला.`,
+      `${rec.quintals} क्विंटलवर किमानापेक्षा फरक ₹${rupee(rec.benefit_inr)} आहे. ही विक्रीची हमी नाही.`,
+    ],
+    why: `हा भाव ${priceAge} दिवस जुना आहे, म्हणून काळजी ठेवा आणि तो साठवलेला समजा. मोडल MSP ₹${rupee(brief.msp_inr)} पेक्षा वर आहे, PIB ${pretty(cache.msp.data.issued_on)}.`,
+    cost_inr: rec.cost_inr,
+    benefit_inr: rec.benefit_inr,
+    risk: "medium",
+    confidence: "medium",
+    sources: [marketSource, mspSource, farmerSource],
+    prices,
+  });
+  const harvestMarathi = card({
+    agent: "paisa",
+    headline: "कापणी खर्च आणि मंडईतील फरक",
+    do: [
+      `${brief.soybean_ha} हेक्टरची कापणी मजुरी ₹${rupee(rec.cost_inr)}.`,
+      `${rec.quintals} क्विंटलवर मोडल आणि किमान यातील फरक ₹${rupee(rec.benefit_inr)}.`,
+      "कापलेले सोयाबीन अजून तोलले नाही, साठा 0 क्विंटल.",
+    ],
+    why: `हेक्टरी ${brief.yield_q_per_ha} क्विंटल हा शेतकऱ्याचा अंदाज आहे, तोल नाही. वाहतूक, पोती आणि ओलावा कापण्यापूर्वी हा फरक हातातला पैसा समजू नका.`,
+    cost_inr: rec.cost_inr,
+    benefit_inr: rec.benefit_inr,
+    risk: "medium",
+    confidence: "medium",
+    sources: [farmerSource, marketSource, mspSource],
+    prices,
+  });
   const irrigateConsult = card({
     agent: "sakha",
     headline: "Wait for rain and skip soybean water",
@@ -733,6 +768,10 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
           "What does this harvest cost, and what is the benefit?",
           harvestMoney,
         ),
+        ...pair("सोयाबीन आता विकू का? काळजी काय?", sellMarathi, { lang: "mr" }),
+        ...pair("कापणीचा खर्च आणि फायदा किती?", harvestMarathi, {
+          lang: "mr",
+        }),
       ],
     },
     {
@@ -813,7 +852,12 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
       rec.cost_inr,
       `₹${rupee(rec.cost_inr)} harvest labour, farmer's own rate, not a surveyed budget`,
     ),
-    memory("sakha", "profile.language", "hi/en", "Hindi and English"),
+    memory(
+      "sakha",
+      "profile.language",
+      "mr/hi/en",
+      "Marathi, Hindi and English",
+    ),
     memory(
       "sakha",
       "plan.current",
