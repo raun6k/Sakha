@@ -17,6 +17,7 @@
     "build": "pnpm --filter @sakha/web build && tsc -p apps/server/tsconfig.build.json && tsx apps/server/src/build-assets.ts",
     "start": "node --env-file-if-exists=.env --conditions=sakha-release apps/server/dist/apps/server/src/index.js",
     "operator": "node --env-file-if-exists=.env --import tsx apps/server/src/cli.ts",
+    "seed:demo": "node --env-file-if-exists=.env --import tsx apps/server/src/cli.ts seed",
     "test:browser": "playwright test -c apps/web/integration.playwright.config.ts",
     "test:demo": "playwright test -c apps/web/playwright.config.ts",
     "demo:init": "sh scripts/sakha-demo init",

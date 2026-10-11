@@ -1,0 +1,45 @@
+{
+  "captured_at": "2026-10-11T07:12:00.000Z",
+  "location": {
+    "latitude": 21.15,
+    "longitude": 79.1,
+    "name": "Nagpur demonstration point, near Kalmeshwar"
+  },
+  "files": {
+    "open_meteo_forecast": {
+      "file": "open-meteo-forecast.json",
+      "fetched_at": "2026-10-11T07:12:00.000Z",
+      "url": "https://api.open-meteo.com/v1/forecast?latitude=21.15&longitude=79.1&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,et0_fao_evapotranspiration&timezone=Asia%2FKolkata&forecast_days=16"
+    },
+    "open_meteo_archive": {
+      "file": "open-meteo-archive.json",
+      "fetched_at": "2026-10-11T07:12:00.000Z",
+      "url": "https://archive-api.open-meteo.com/v1/archive?latitude=21.15&longitude=79.1&start_date=2026-06-01&end_date=2026-10-05&daily=precipitation_sum,temperature_2m_max&timezone=Asia%2FKolkata"
+    },
+    "noaa_oni": {
+      "file": "oni.ascii.txt",
+      "fetched_at": "2026-10-11T07:12:00.000Z",
+      "url": "https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt"
+    },
+    "noaa_roni": {
+      "file": "roni.html",
+      "fetched_at": "2026-10-11T07:12:00.000Z",
+      "url": "https://www.cpc.ncep.noaa.gov/products/analysis_monitoring/enso/roni/"
+    },
+    "nasa_power": {
+      "file": "nasa-power.json",
+      "fetched_at": "2026-10-11T07:12:00.000Z",
+      "url": "https://power.larc.nasa.gov/api/temporal/daily/point?parameters=PRECTOTCORR,T2M_MAX&community=AG&longitude=79.1&latitude=21.15&start=20260901&end=20261001&format=JSON"
+    },
+    "agmarknet": {
+      "file": "agmarknet-soyabean.json",
+      "fetched_at": "2026-10-11T07:12:00.000Z",
+      "url": "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070"
+    },
+    "msp": {
+      "file": "msp-soybean.json",
+      "fetched_at": "2026-10-11T07:12:00.000Z",
+      "url": "https://www.pib.gov.in/PressReleasePage.aspx?PRID=2260618"
+    }
+  }
+}

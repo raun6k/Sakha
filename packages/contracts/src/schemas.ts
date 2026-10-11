@@ -19,6 +19,53 @@ export const RoleKey = z.enum([
   "farm_finance",
   "government_support",
 ]);
+/** Stable farm-team ids. The seed maps these onto RoleKey until the backend uses them directly. */
+export const AgentId = z.enum(["sakha", "megha", "jal", "kheti", "paisa"]);
+export type AgentId = z.infer<typeof AgentId>;
+export const CardSource = z.object({
+  title: z.string().min(1),
+  url: z.string().optional(),
+  adapter: z.string().optional(),
+  fetched_at: Timestamp,
+});
+export const Card = z.object({
+  agent: AgentId,
+  headline: z.string().min(1),
+  do: z.array(z.string().min(1)).min(1).max(3),
+  why: z.string().min(1),
+  cost_inr: z.number().optional(),
+  benefit_inr: z.number().optional(),
+  risk: z.enum(["low", "medium", "high"]),
+  confidence: z.enum(["low", "medium", "high"]),
+  sources: z.array(CardSource).min(1),
+  handoff_suggestion: z
+    .object({ to: AgentId, reason: z.string().min(1) })
+    .optional(),
+  out_of_scope: z.boolean().optional(),
+  forecast_days: z
+    .array(
+      z.object({
+        date: z.string(),
+        rain_mm: z.number().nullable(),
+        tmax: z.number().nullable(),
+        prob: z.number().nullable(),
+      }),
+    )
+    .optional(),
+  action: z.enum(["irrigate", "wait"]).optional(),
+  mm: z.number().optional(),
+  pump_hours: z.number().optional(),
+  prices: z
+    .array(
+      z.object({
+        mandi: z.string(),
+        modal_inr: z.number(),
+        date: z.string(),
+      }),
+    )
+    .optional(),
+});
+export type Card = z.infer<typeof Card>;
 export type RoleKey = z.infer<typeof RoleKey>;
 export const roles = RoleKey.options;
 export const Scope = z.object({ farm_id: Id, field_id: Id.optional() });
@@ -209,6 +256,10 @@ export const Message = RecordBase.extend({
     evidence: z.array(EvidenceRef),
     field_id: Id.optional(),
   }),
+  team_id: AgentId.optional(),
+  reviewed_by: AgentId.optional(),
+  consulted: z.array(AgentId).optional(),
+  card: Card.optional(),
 });
 export const Conversation = RecordBase.extend({
   role_key: RoleKey,
@@ -486,6 +537,15 @@ export const Home = z.object({
   alerts: z.array(Alert),
   insights: Insights,
   capabilities: z.array(Capability),
+  team_status: z
+    .array(
+      z.object({
+        id: AgentId,
+        name: z.string(),
+        line: z.string(),
+      }),
+    )
+    .optional(),
 });
 export const Bootstrap = z.object({
   demo_profile: z.boolean().default(false),

@@ -1,0 +1,97 @@
+{
+  "fetched_at": "2026-10-11T07:12:00.000Z",
+  "live": false,
+  "resource_id": "9ef84268-d588-465a-a308-a864a43d0070",
+  "url": "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070",
+  "note": "api.data.gov.in did not complete a TLS handshake from this network on 11 Oct 2026 (OpenSSL unexpected EOF; HTTP returned 502). These rows are the Agmarknet soybean quotes republished the same morning by https://acrop.app/mandi/maharashtra/nagpur/nagpur/soybean, which attributes data.gov.in. They are not a live response from the resource URL. Nagpur APMC's latest row is 7 Oct 2026.",
+  "records": [
+    {
+      "state": "Maharashtra",
+      "district": "Nagpur",
+      "market": "Nagpur APMC",
+      "commodity": "Soyabean",
+      "variety": "Soyabean",
+      "arrival_date": "2026-10-07",
+      "min_price": "5500",
+      "max_price": "6400",
+      "modal_price": "6175"
+    },
+    {
+      "state": "Maharashtra",
+      "district": "Nagpur",
+      "market": "Nagpur APMC",
+      "commodity": "Soyabean",
+      "variety": "Soyabean",
+      "arrival_date": "2026-10-06",
+      "min_price": "5500",
+      "max_price": "6100",
+      "modal_price": "5950"
+    },
+    {
+      "state": "Maharashtra",
+      "district": "Nagpur",
+      "market": "Nagpur APMC",
+      "commodity": "Soyabean",
+      "variety": "Soyabean",
+      "arrival_date": "2026-10-05",
+      "min_price": "5500",
+      "max_price": "6121",
+      "modal_price": "5965"
+    },
+    {
+      "state": "Maharashtra",
+      "district": "Nagpur",
+      "market": "Nagpur APMC",
+      "commodity": "Soyabean",
+      "variety": "Soyabean",
+      "arrival_date": "2026-10-03",
+      "min_price": "5000",
+      "max_price": "5800",
+      "modal_price": "5600"
+    },
+    {
+      "state": "Maharashtra",
+      "district": "Nagpur",
+      "market": "Nagpur APMC",
+      "commodity": "Soyabean",
+      "variety": "Soyabean",
+      "arrival_date": "2026-10-01",
+      "min_price": "5400",
+      "max_price": "5701",
+      "modal_price": "5625"
+    },
+    {
+      "state": "Maharashtra",
+      "district": "Nagpur",
+      "market": "Katol APMC",
+      "commodity": "Soyabean",
+      "variety": "Soyabean",
+      "arrival_date": "2026-10-09",
+      "min_price": "5511",
+      "max_price": "6560",
+      "modal_price": "6050"
+    },
+    {
+      "state": "Maharashtra",
+      "district": "Nagpur",
+      "market": "Savner APMC",
+      "commodity": "Soyabean",
+      "variety": "Soyabean",
+      "arrival_date": "2026-10-08",
+      "min_price": "6200",
+      "max_price": "6670",
+      "modal_price": "6450"
+    },
+    {
+      "state": "Maharashtra",
+      "district": "Nagpur",
+      "market": "Umared APMC",
+      "commodity": "Soyabean",
+      "variety": "Soyabean",
+      "arrival_date": "2026-10-08",
+      "min_price": "5200",
+      "max_price": "6610",
+      "modal_price": "5871"
+    }
+  ]
+}

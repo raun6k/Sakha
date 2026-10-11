@@ -5,6 +5,7 @@
       "**",
       "!docs",
       "!demo/sources",
+      "!packages/data/cache",
       "!.local",
       "!**/dist",
       "!**/node_modules",
