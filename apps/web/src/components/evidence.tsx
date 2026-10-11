@@ -7,6 +7,14 @@ type EvidenceRef = Finding["evidence"][number];
 
 import { useCommand, useFarmId, useRead } from "../services/context";
 import {
+  alertStatusLabel,
+  completenessLabel,
+  freshnessLabel,
+  originLabel,
+  roleLabel,
+  severityLabel,
+} from "../services/labels";
+import {
   Badge,
   Card,
   DateText,
@@ -193,23 +201,30 @@ export function SourceDetails({
 }
 export function EvidenceLinks({ evidence }: { evidence: EvidenceRef[] }) {
   const [selected, setSelected] = useState<EvidenceRef>();
+  const sources = useRead("listSources", { input: {} });
+  const sourceName = (id: string) =>
+    sources.data?.find((source) => source.id === id)?.name ??
+    "Supporting evidence";
   return (
     <>
       {evidence.length ? (
-        <div className="actions">
-          {evidence.map((ref) => (
-            <button
-              type="button"
-              className="button secondary"
-              key={ref.evidence_id}
-              onClick={() => setSelected(ref)}
-            >
-              Source {ref.source_id}
-            </button>
-          ))}
-        </div>
+        <details className="help-details">
+          <summary>Evidence</summary>
+          <div className="actions">
+            {evidence.map((ref) => (
+              <button
+                type="button"
+                className="button secondary"
+                key={ref.evidence_id}
+                onClick={() => setSelected(ref)}
+              >
+                {sourceName(ref.source_id)}
+              </button>
+            ))}
+          </div>
+        </details>
       ) : (
-        <p className="chart-meta">No source evidence attached.</p>
+        <p className="chart-meta">No source is attached to this result.</p>
       )}
       {selected ? (
         <SourceDetails
@@ -336,25 +351,35 @@ export function ChartCard({
         </State>
       )}
       <p className="chart-meta">
-        {series.unit} · {series.geography} · {series.resolution}
+        {series.unit} · {series.geography}
         <br />
         {series.kind === "forecast"
-          ? "Forecast within supported horizon"
+          ? "Forecast, within the source horizon"
           : series.source_id === "W03"
-            ? "Historical gridded estimate"
-            : "Observed series"}{" "}
-        · {series.completeness} coverage · {series.freshness.status}
-        <br />
-        Period{" "}
-        {new Date(series.supported_range.from).toLocaleDateString("en-IN")} –{" "}
-        {new Date(series.supported_range.to).toLocaleDateString("en-IN")}
-        {series.baseline ? (
-          <>
-            <br />
-            Baseline: {series.baseline}
-          </>
-        ) : null}
+            ? "Gridded rainfall estimate, not a field gauge"
+            : "Recorded series"}{" "}
+        · {freshnessLabel(series.freshness.status)}
       </p>
+      {series.freshness.reason &&
+      ["stale", "missing", "partial"].includes(series.freshness.status) ? (
+        <p className="chart-meta">{series.freshness.reason}</p>
+      ) : null}
+      <details className="help-details">
+        <summary>How this chart was made</summary>
+        <p className="chart-meta">
+          {series.resolution} · {completenessLabel(series.completeness)}
+          <br />
+          Period{" "}
+          {new Date(series.supported_range.from).toLocaleDateString("en-IN")} –{" "}
+          {new Date(series.supported_range.to).toLocaleDateString("en-IN")}
+          {series.baseline ? (
+            <>
+              <br />
+              Baseline: {series.baseline}
+            </>
+          ) : null}
+        </p>
+      </details>
       {series.origin === "fixture" ? (
         <p className="chart-meta">
           Synthetic values for interface review. Gaps stay gaps.
@@ -448,15 +473,15 @@ export function AlertDetails({
       <p>{alert.summary}</p>
       <div className="actions">
         <Badge tone={alert.severity === "warning" ? "red" : "gold"}>
-          {alert.severity}
+          {severityLabel(alert.severity)}
         </Badge>
-        <Badge>{alert.status}</Badge>
+        <Badge>{alertStatusLabel(alert.status)}</Badge>
       </div>
       <p className="chart-meta">
         Issued <DateText value={alert.issued_at} /> · Valid until{" "}
         <DateText value={alert.valid_until} />
         <br />
-        Evidence freshness: {alert.freshness.status}
+        Evidence: {freshnessLabel(alert.freshness.status)}
       </p>
       <EvidenceLinks evidence={alert.evidence} />
       <ErrorNotice error={command.error ?? dismiss.error} />
@@ -513,8 +538,8 @@ export function FindingDetails({
     <Modal open onClose={onClose} title={finding.title}>
       <p>{finding.summary}</p>
       <p className="chart-meta">
-        {finding.role_key.replaceAll("_", " ")} ·{" "}
-        {finding.origin.replaceAll("_", " ")} · {finding.freshness.status}
+        {roleLabel(finding.role_key)} · {originLabel(finding.origin)} ·{" "}
+        {freshnessLabel(finding.freshness.status)}
       </p>
       <h3>Assumptions and missing inputs</h3>
       <ul>

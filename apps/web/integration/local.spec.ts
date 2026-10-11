@@ -54,8 +54,6 @@ async function setup(page: import("@playwright/test").Page) {
   await page
     .getByLabel("Your name or farm name (optional)")
     .fill("Synthetic integration farm");
-  await page.getByLabel("State (optional)").fill("Maharashtra");
-  await page.getByLabel("District (optional)").fill("Nagpur");
   await page.getByRole("button", { name: "Skip this step" }).click();
   await page.getByRole("button", { name: "Skip this step" }).click();
   await page.getByRole("button", { name: "Open my Command Center" }).click();

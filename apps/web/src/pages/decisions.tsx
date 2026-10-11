@@ -10,7 +10,6 @@ import { Link } from "react-router";
 import { AlertDetails, EvidenceLinks } from "../components/evidence";
 import {
   Badge,
-  Banner,
   Card,
   DateText,
   ErrorNotice,
@@ -22,6 +21,14 @@ import {
   State,
 } from "../components/ui";
 import { useCommand, useFarmId, useRead } from "../services/context";
+import {
+  alertStatusLabel,
+  freshnessLabel,
+  planStatusLabel,
+  recordKindLabel,
+  roleLabel,
+  severityLabel,
+} from "../services/labels";
 export function WorkConfirmation({
   task,
   onClose,
@@ -210,7 +217,7 @@ function PlanReview({
     >
       <h3>{revision.title}</h3>
       <p className="chart-meta">
-        Revision {revision.version} · {revision.status}
+        Revision {revision.version} · {planStatusLabel(revision.status)}
       </p>
       <p>{revision.summary}</p>
       <h3 style={{ marginTop: 20 }}>Assumptions and changes</h3>
@@ -388,9 +395,8 @@ export function PlanPage() {
     <div className="route-content">
       <PageHeading
         title="Your Farm Plan"
-        description="Understand what is proposed, what you chose, and what actually happened."
+        description="See the plan you approved, and review any proposal before it changes that plan."
       />
-      <Banner text="A considered plan. One decision at a time." />
       <div className="tabs" role="tablist" aria-label="Plan period">
         {["day", "week", "season"].map((p) => (
           <button
@@ -404,14 +410,21 @@ export function PlanPage() {
           </button>
         ))}
       </div>
-      <Card title="Active approved revision">
+      <Card title="Approved plan">
         {q.data?.active_revision ? (
           <>
             <h3>{q.data.active_revision.title}</h3>
             <p className="chart-meta">{q.data.active_revision.summary}</p>
-            <Badge tone="green">
-              Approved · revision {q.data.active_revision.version}
-            </Badge>
+            <Badge tone="green">Approved</Badge>
+            <p className="chart-meta">
+              Field work is recorded only when you confirm it separately.
+            </p>
+            <details className="help-details">
+              <summary>Plan record</summary>
+              <p className="chart-meta">
+                Revision {q.data.active_revision.version}
+              </p>
+            </details>
             <EvidenceLinks evidence={q.data.active_revision.evidence} />
           </>
         ) : (
@@ -421,14 +434,14 @@ export function PlanPage() {
           </State>
         )}
       </Card>
-      <Card title="Proposed revisions">
+      <Card title="Proposals to review">
         {q.data?.proposed_revisions.length ? (
           q.data.proposed_revisions.map((r) => (
             <div className="list-row" key={r.id}>
               <div>
                 <h3>{r.title}</h3>
                 <p>{r.summary}</p>
-                <Badge tone="gold">{r.status.replaceAll("_", " ")}</Badge>
+                <Badge tone="gold">{planStatusLabel(r.status)}</Badge>
               </div>
               <button
                 type="button"
@@ -593,9 +606,8 @@ export function AlertsPage() {
     <div className="route-content">
       <PageHeading
         title="Alerts & Notifications"
-        description="Review relevant warnings, changed assumptions and reminders."
+        description="Read a warning and choose a next step. Noting an alert does not record field work."
       />
-      <Banner text="Understand the warning. Choose your next step." />
       <div className="tabs" role="tablist" aria-label="Alert history">
         {["current", "history"].map((t) => (
           <button
@@ -625,13 +637,13 @@ export function AlertsPage() {
             <div className="section-head">
               <h2>{a.title}</h2>
               <Badge tone={a.severity === "warning" ? "red" : "gold"}>
-                {a.severity}
+                {severityLabel(a.severity)}
               </Badge>
             </div>
             <p>{a.summary}</p>
             <p className="chart-meta">
-              {a.role_key.replaceAll("_", " ")} · {a.status} ·{" "}
-              {a.freshness.status}
+              {roleLabel(a.role_key)} · {alertStatusLabel(a.status)} ·{" "}
+              {freshnessLabel(a.freshness.status)}
               <br />
               Issued <DateText value={a.issued_at} /> · valid until{" "}
               <DateText value={a.valid_until} />
@@ -656,7 +668,7 @@ export function AlertsPage() {
       ) : (
         <Card>
           <State title="No matching alerts recorded">
-            An unavailable feed cannot establish a fresh all clear.
+            No matching alert is saved. That does not mean conditions are safe.
           </State>
         </Card>
       )}
@@ -782,7 +794,7 @@ export function ActivityPage() {
             "alert",
           ].map((k) => (
             <option value={k} key={k}>
-              {k.replaceAll("_", " ")}
+              {recordKindLabel(k)}
             </option>
           ))}
         </select>
@@ -804,7 +816,7 @@ export function ActivityPage() {
                         : "neutral"
                   }
                 >
-                  {h.kind.replaceAll("_", " ")}
+                  {recordKindLabel(h.kind)}
                 </Badge>
                 <h3 style={{ marginTop: 8 }}>{h.title}</h3>
                 <p>{h.summary}</p>

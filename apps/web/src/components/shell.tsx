@@ -125,11 +125,6 @@ export function Shell() {
           <NavItems items={secondary} />
         </nav>
         <div className="sidebar-foot">
-          <Leaf size={22} />
-          <p>
-            One farm.
-            <br />A clearer way forward.
-          </p>
           <small>Local work pauses when Sakha stops.</small>
         </div>
       </aside>

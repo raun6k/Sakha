@@ -4,12 +4,8 @@ import type { createApp } from "./app.js";
 
 export const DEMO_ID = "sakha-public-demo.v1";
 export const DEMO_LOCATION = {
-  country: "India",
-  state: "Maharashtra",
-  district: "Nagpur",
+  ...c.nagpurPlace,
   village: "Public Nagpur demonstration point",
-  latitude: 21.15,
-  longitude: 79.1,
 };
 type Services = ReturnType<typeof createApp>;
 export function isDemo(store: Services["store"]) {

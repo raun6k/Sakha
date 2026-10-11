@@ -102,7 +102,7 @@ When a check fails, identify and fix the cause with the smallest relevant reprod
 - Inspect status/diff and stage explicit task-owned paths. Do not sweep unrelated files into a commit with `git add .`. Include relevant tests and manifest/lockfile/migration changes with the behavior they support.
 - Use clear messages describing the result, for example `feat: add farm profile persistence`, `fix: deduplicate agent message delivery`, `test: cover plan approval transitions`, or `docs: clarify contributor workflow`.
 - Run the checkpoint checks appropriate to that part before committing it. Do not rerun the whole suite just to create a commit after relevant checks already passed. Do not commit known attributable failures as a completed feature.
-- Continue on the task's existing branch unless the user requests otherwise or isolation is needed; new branches use `codex/` by default. Never overwrite/revert user work, rewrite history or amend someone else's commits to make the tree look clean.
+- Continue on the task's existing branch unless the user requests otherwise or isolation is needed; new branches use `raun6k/` by default. Never overwrite/revert user work, rewrite history or amend someone else's commits to make the tree look clean.
 - Local commits are authorized by the user's requested workflow; do not ask for permission each time. Do not push, publish, deploy or open a public PR unless the user authorizes that action.
 - This checkout currently excludes `docs/` locally. Preserve that boundary during ordinary implementation; do not accidentally add the reference archive/private artifacts when staging. `AGENTS.md` should be versioned so this guidance accompanies the source. Publishing the design docs/assets is a separate scoped change.
 

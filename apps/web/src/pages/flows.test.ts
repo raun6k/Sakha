@@ -328,6 +328,6 @@ describe("demo navigation and welcome", () => {
       screen.getByRole("button", { name: "Edit farm location" }),
     );
     await screen.findByRole("heading", { name: "Review farm location" });
-    expect(screen.getByLabelText("District")).toBeDefined();
+    expect(screen.getByText(/Nagpur district, Maharashtra/)).toBeDefined();
   });
 });

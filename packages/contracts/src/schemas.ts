@@ -112,6 +112,15 @@ export const Location = z.object({
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
 });
+/** Official district forecast and rainfall evidence shipped with Sakha. */
+export const nagpurPlace = {
+  country: "India",
+  state: "Maharashtra",
+  district: "Nagpur",
+  village: "Nagpur district",
+  latitude: 21.15,
+  longitude: 79.1,
+} as const;
 export const Farm = RecordBase.extend({
   name: z.string().min(1),
   location: Location.optional(),

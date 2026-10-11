@@ -48,9 +48,9 @@ it("imports dated official snapshots offline once with complete rainfall coverag
     evidence.length,
   );
 });
-it("rejects a different location rather than assigning the demo rainfall to it", () => {
+it("keeps Nagpur as the only farm place and refuses another stored point", () => {
   const { services } = context();
-  const other = c.Farm.parse(
+  const created = c.Farm.parse(
     services.farm.execute(
       "createFarm",
       {
@@ -66,6 +66,21 @@ it("rejects a different location rather than assigning the demo rainfall to it",
       {},
     ),
   );
+  expect(created.location).toMatchObject(c.nagpurPlace);
+  const other = c.Farm.parse({
+    ...services.farm.makeBase("other-point"),
+    id: "other-point",
+    name: "Other point",
+    setup_complete: false,
+    location: {
+      country: "India",
+      state: "Maharashtra",
+      district: "Pune",
+      latitude: 18.52,
+      longitude: 73.85,
+    },
+  });
+  services.store.put("farm", other);
   expect(() => importDemoSources(services, other.id)).toThrow(
     "different location point",
   );

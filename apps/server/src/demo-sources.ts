@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import * as c from "@sakha/contracts";
+import type { createDataServices } from "@sakha/data";
 import { assertSourceUrl, DocumentImport } from "@sakha/data";
+import type { createFarmServices } from "@sakha/farm";
 import { DomainError } from "@sakha/farm";
 import { z } from "zod";
-import type { createApp } from "./app.js";
+import type { Storage } from "./storage/database.js";
 
 const Snapshot = z.object({
   version: z.literal("sakha.demo-sources.v1"),
@@ -37,7 +39,11 @@ const Snapshot = z.object({
   ),
 });
 export function importDemoSources(
-  services: ReturnType<typeof createApp>,
+  services: {
+    store: Storage;
+    farm: ReturnType<typeof createFarmServices>;
+    dataServices: ReturnType<typeof createDataServices>;
+  },
   farmId: string,
   directory = new URL("../../../demo/sources/", import.meta.url),
 ) {

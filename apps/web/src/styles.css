@@ -217,7 +217,9 @@ th {
   font-size: 1.06rem;
 }
 .sidebar-foot small {
-  color: #a9c0af;
+  color: #cad7c8;
+  font-size: 0.95rem;
+  line-height: 1.45;
 }
 .main-wrap {
   margin-left: 246px;

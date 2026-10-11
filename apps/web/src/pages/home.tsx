@@ -35,7 +35,7 @@ export function HomePage() {
   if (q.isPending) return <Loading />;
   if (q.error)
     return (
-      <State title="Command Center unavailable" retry={() => void q.refetch()}>
+      <State title="Home is unavailable" retry={() => void q.refetch()}>
         {q.error.message}
       </State>
     );
@@ -89,7 +89,7 @@ export function HomePage() {
       <header className="farm-banner home-hero">
         <div>
           <h1>{greeting(new Date().getHours())}</h1>
-          <p>Healthier farms begin with clearer decisions.</p>
+          <p>Review what needs a decision, then ask Sakha.</p>
         </div>
         <button
           type="button"
@@ -160,7 +160,7 @@ export function HomePage() {
                 <EvidenceLinks evidence={o.evidence} />
               ) : null}
               <Link className="text-link" to={`/agents/${o.role}?tab=chat`}>
-                View specialist <ArrowRight size={15} />
+                Ask about this <ArrowRight size={15} />
               </Link>
             </Card>
           ))}
@@ -215,7 +215,12 @@ export function HomePage() {
                 <div>
                   <h3>{t.title}</h3>
                   <p>
-                    {t.status} · {t.description}
+                    {t.status === "pending"
+                      ? "Waiting"
+                      : t.status === "deferred"
+                        ? "Not yet"
+                        : "Proposal"}{" "}
+                    · {t.description}
                   </p>
                 </div>
                 <Link className="text-link" to="/plan">
@@ -225,7 +230,8 @@ export function HomePage() {
             ))}
           {!home.alerts.length && !home.sections.actions.length ? (
             <State title="No attention items recorded">
-              An unavailable feed does not establish an all clear.
+              Nothing saved here needs a decision. That does not mean the field
+              is all clear.
             </State>
           ) : null}
         </Card>

@@ -17,6 +17,7 @@ import { Dialog } from "radix-ui";
 import { type ReactNode, useRef } from "react";
 import { Link } from "react-router";
 import { errorMessage } from "../services/http";
+import { capabilityLabel, chatStatusLabel } from "../services/labels";
 export const roleIcons: Record<RoleKey, typeof Leaf> = {
   chief_of_staff: Sparkles,
   climate: TrendingUp,
@@ -76,14 +77,6 @@ export function PageHeading({
       </div>
       {children}
     </header>
-  );
-}
-export function Banner({ text }: { text: string }) {
-  return (
-    <div className="farm-banner">
-      <p>{text}</p>
-      <span>Recorded context. Thoughtful decisions.</span>
-    </div>
   );
 }
 export function Badge({
@@ -176,10 +169,11 @@ export function Modal({
               <X size={22} />
             </Dialog.Close>
           </div>
-          <Dialog.Description className="muted">
-            {description ??
-              "Review the details below. Closing returns you to your current page."}
-          </Dialog.Description>
+          {description ? (
+            <Dialog.Description className="muted">
+              {description}
+            </Dialog.Description>
+          ) : null}
           {children}
         </Dialog.Content>
       </Dialog.Portal>
@@ -253,11 +247,11 @@ export function RoleCard({
       <div className="section-head">
         <RoleIcon role={role.key} />
         <Badge tone={cap?.status === "enabled" ? "green" : "gold"}>
-          {cap?.status.replaceAll("_", " ") ?? "Unavailable"}
+          {chatStatusLabel(cap?.status)}
         </Badge>
       </div>
       <h2>{role.name}</h2>
-      <p>{role.description}</p>
+      {compact ? null : <p>{role.description}</p>}
       {compact ? null : <p className="role-question">“{role.questions[0]}”</p>}
       <div className="actions">
         <Link
@@ -297,7 +291,7 @@ export function SourceCard({
       <div>
         <h3>{source.name}</h3>
         <p>{source.definition}</p>
-        <Badge>{source.capability.status.replaceAll("_", " ")}</Badge>
+        <Badge>{capabilityLabel(source.capability.status)}</Badge>
       </div>
       <button type="button" className="button secondary" onClick={onOpen}>
         Source details

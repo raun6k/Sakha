@@ -14,6 +14,7 @@ import {
 import Fastify from "fastify";
 import { z } from "zod";
 import { isDemo } from "./demo.js";
+import { importDemoSources } from "./demo-sources.js";
 import { replayEvents } from "./events.js";
 import { createExecution } from "./execution.js";
 import { createLifecycle } from "./lifecycle.js";
@@ -363,7 +364,17 @@ export function createApp(options: {
           ];
           if (domainNames.some((part) => name.includes(part)))
             return domain.execute(name as c.OperationName, input, params);
-          return farm.execute(name as c.OperationName, input, params);
+          const saved = farm.execute(name as c.OperationName, input, params);
+          if (name === "createFarm" || name === "updateFarm") {
+            const profile = c.Farm.safeParse(saved);
+            if (
+              profile.success &&
+              profile.data.location?.latitude === c.nagpurPlace.latitude &&
+              profile.data.location.longitude === c.nagpurPlace.longitude
+            )
+              importDemoSources({ store, farm, dataServices }, profile.data.id);
+          }
+          return saved;
         };
         const key = request.headers["idempotency-key"];
         if (operation.method !== "GET" && typeof key !== "string")
@@ -488,5 +499,18 @@ export function createApp(options: {
     await execution.stop();
     store.close();
   });
+  for (const farmId of store.farms()) {
+    const profile = farm.assertFarm(farmId);
+    if (
+      profile.location?.latitude !== c.nagpurPlace.latitude ||
+      profile.location?.longitude !== c.nagpurPlace.longitude
+    )
+      farm.execute(
+        "updateFarm",
+        { expected_version: profile.version, location: c.nagpurPlace },
+        { farmId },
+      );
+    importDemoSources({ store, farm, dataServices }, farmId);
+  }
   return { app, ...services, execution, sessionToken };
 }

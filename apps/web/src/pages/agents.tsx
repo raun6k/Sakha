@@ -32,7 +32,6 @@ import {
 } from "../components/evidence";
 import {
   Badge,
-  Banner,
   Card,
   DateText,
   ErrorNotice,
@@ -54,6 +53,7 @@ import {
   useService,
 } from "../services/context";
 import { commandKey } from "../services/http";
+import { capabilityLabel, runStatusLabel } from "../services/labels";
 import { emptyStream, reconcileEvent } from "../state/stream";
 import { useUi } from "../state/ui";
 import { QuickUpdate } from "./farm";
@@ -68,34 +68,19 @@ const category: { title: string; roles: string[] }[] = [
 ];
 export function RoleAbout({ role }: { role: Role }) {
   const [source, setSource] = useState<string>();
+  const sources = useRead("listSources", { input: {} });
+  const chat = role.capabilities.find((item) => item.key === "chat");
+  const sourceName = (id: string) =>
+    sources.data?.find((item) => item.id === id)?.name ?? "Source details";
   return (
     <>
-      <h2>What does this specialist do?</h2>
-      <p className="chart-meta">{role.description}</p>
-      <h3>How can it help me?</h3>
+      <h2>How this can help</h2>
       <ul>
         {role.help.map((text) => (
           <li key={text}>{text}</li>
         ))}
       </ul>
-      <h3>What information does it use?</h3>
-      <p className="chart-meta">
-        Authorized shared farm context and supported source evidence. A catalog
-        assignment does not establish a successful fetch.
-      </p>
-      <div className="actions">
-        {role.source_ids.map((id) => (
-          <button
-            type="button"
-            className="button secondary"
-            key={id}
-            onClick={() => setSource(id)}
-          >
-            Source {id}
-          </button>
-        ))}
-      </div>
-      <h3 style={{ marginTop: 24 }}>What can I ask?</h3>
+      <h3>What you can ask</h3>
       <ul>
         {role.questions.map((text) => (
           <li key={text}>{text}</li>
@@ -107,12 +92,38 @@ export function RoleAbout({ role }: { role: Role }) {
           <li key={text}>{text}</li>
         ))}
       </ul>
-      {role.capabilities.map((c) => (
-        <p className="chart-meta" key={c.key}>
-          {c.key.replaceAll("_", " ")}: {c.status.replaceAll("_", " ")}
-          {c.reason ? ` — ${c.reason}` : ""}
+      {chat && chat.status !== "enabled" ? (
+        <p className="chart-meta">
+          {chat.reason ??
+            "Asking this specialist needs a configured runtime and your consent."}
         </p>
-      ))}
+      ) : null}
+      <details className="help-details">
+        <summary>Sources and other capabilities</summary>
+        <p className="chart-meta">
+          A listed source is not proof that a current reading was retrieved.
+        </p>
+        <div className="actions">
+          {role.source_ids.map((id) => (
+            <button
+              type="button"
+              className="button secondary"
+              key={id}
+              onClick={() => setSource(id)}
+            >
+              {sourceName(id)}
+            </button>
+          ))}
+        </div>
+        {role.capabilities
+          .filter((item) => item.key !== "chat")
+          .map((item) => (
+            <p className="chart-meta" key={item.key}>
+              {item.key.replaceAll("_", " ")}: {capabilityLabel(item.status)}
+              {item.reason ? ` — ${item.reason}` : ""}
+            </p>
+          ))}
+      </details>
       {source ? (
         <SourceDetails sourceId={source} onClose={() => setSource(undefined)} />
       ) : null}
@@ -136,9 +147,8 @@ export function AgentsPage() {
     <div className="route-content">
       <PageHeading
         title="Your farming specialists"
-        description="Eight dedicated roles. One shared farm context."
+        description="Choose who should answer this kind of question. Ask Sakha when you want one coordinated view."
       />
-      <Banner text="The right perspective for every farming question." />
       {category.map((group) => (
         <section className="section-block" key={group.title}>
           <div className="section-head">
@@ -657,7 +667,7 @@ export function ConversationView({ role }: { role: Role }) {
             <MessageCircle size={19} />
             {stream.progress[runId] ??
               run.data.progress ??
-              run.data.state.replaceAll("_", " ")}
+              runStatusLabel(run.data.state)}
             {run.data.state === "completed" ? <Check size={18} /> : null}
           </div>
           <PendingRun run={run.data} />
@@ -784,9 +794,8 @@ export function AskPage() {
     <div className="route-content">
       <PageHeading
         title="Ask Sakha"
-        description="Your Chief of Staff for coordinated farming decisions."
+        description="Ask one question about the farm. Sakha can bring in the relevant specialists."
       />
-      <Banner text="A shared view. A considered next step." />
       {q.error ? (
         <ErrorNotice error={q.error} />
       ) : role ? (
@@ -798,8 +807,8 @@ export function AskPage() {
             <FarmContext />
             <Card title="Working together">
               <p>
-                Permitted specialists can contribute internally. Missing results
-                stay visible; no percentage implies confidence.
+                Other specialists can add what they know. If something is
+                missing, Sakha says so instead of filling the gap.
               </p>
               <div className="actions">
                 <Link className="text-link" to="/agents">
@@ -1759,7 +1768,6 @@ export function WorkspacePage() {
       <PageHeading title={role.data.name} description={role.data.description}>
         <RoleIcon role={key} />
       </PageHeading>
-      <Banner text={role.data.label} />
       <nav className="tabs" aria-label="Workspace sections">
         {["about", "chat", "preferences", "history"].map((t) => (
           <button
@@ -1822,17 +1830,10 @@ export function WorkspacePage() {
         </div>
         <aside className="rail">
           <FarmContext />
-          <Card title="Useful next steps">
-            <div className="data-list">
-              <Link to="/plan">Review your farm plan</Link>
-              <Link to="/insights">Explore source evidence</Link>
-              <Link to="/settings">Application preferences & privacy</Link>
-            </div>
-            <p className="chart-meta">
-              Preferences stay separate from shared facts. Decisions stay
-              separate from actual work.
-            </p>
-          </Card>
+          <p className="chart-meta">
+            Preferences do not change farm facts. Approving a plan does not
+            record field work.
+          </p>
         </aside>
       </div>
     </div>

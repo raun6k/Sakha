@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { ChartCard, SourceDetails } from "../components/evidence";
 import {
-  Banner,
   Card,
   ErrorNotice,
   Field,
@@ -41,9 +40,8 @@ export function InsightsPage() {
     <div className="route-content">
       <PageHeading
         title="Insights & Analytics"
-        description="Explore rainfall, climate signals and the evidence behind them."
+        description="Read rainfall and climate evidence, including where it stops."
       />
-      <Banner text="Understand the evidence. Keep its limits in view." />
       <div className="tabs" role="tablist" aria-label="Insight series">
         {[
           ["W03", "Historical rainfall"],
@@ -309,7 +307,7 @@ function ConsentPanel() {
       </p>
       <p className="chart-meta">
         Standard scope covers farm location, equipment, cultivation, water and
-        reported crop observations for A0 and all eight specialist roles.
+        reported crop observations for Ask Sakha and all eight specialist roles.
         Finance and support details require the separate choices below.
       </p>
       <Field label="Purpose">
@@ -627,9 +625,8 @@ export function SettingsPage() {
     <div className="route-content">
       <PageHeading
         title="Application Settings"
-        description="Global defaults, accessibility and control over your local information."
+        description="Choose how Sakha looks, and what it may store or send."
       />
-      <Banner text="Your farm. Your preferences. Your choice." />
       {q.isPending ? (
         <Loading />
       ) : q.data ? (
@@ -661,11 +658,11 @@ export function SettingsPage() {
 const help = [
   [
     "How Sakha works",
-    "Record what you know about your farm, inspect supported source evidence and ask A0 or a specialist. Review any proposed plan before choosing it. Report actual work only after it happened.",
+    "Record what you know about your farm, look at the evidence, and ask Sakha or a specialist. Review a proposal before you choose it. Report field work only after it happened.",
   ],
   [
     "Understanding the agents",
-    "A0 coordinates your shared plan. Eight specialists cover climate, weather, crop planning, crop care, water, markets, finance and government support. Permitted peers can collaborate without changing your page.",
+    "Ask Sakha coordinates your shared plan. Eight specialists cover climate, weather, crop planning, crop care, water, markets, finance and government support. They can consult one another without changing your page.",
   ],
   [
     "Forecast and evidence limitations",
@@ -696,9 +693,8 @@ export function HelpPage() {
     <div className="route-content">
       <PageHeading
         title="Help & Data Sources"
-        description="Understand Sakha, its evidence and the limits of local assistance."
+        description="Learn what Sakha can do, and where the evidence stops."
       />
-      <Banner text="Clear sources. Clear choices." />
       <div className="workspace-layout">
         <div>
           <Card title="Using Sakha">

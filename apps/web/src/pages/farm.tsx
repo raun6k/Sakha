@@ -1,10 +1,14 @@
-import type { Fact, Farm, OperationInput } from "@sakha/contracts";
+import {
+  type Fact,
+  type Farm,
+  nagpurPlace,
+  type OperationInput,
+} from "@sakha/contracts";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Leaf } from "lucide-react";
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import {
-  Banner,
   Card,
   DateText,
   ErrorNotice,
@@ -132,15 +136,7 @@ export function Setup() {
       let farm =
         savedSetupFarm.current ??
         (bootstrap.data ? bootstrapFarm(bootstrap.data) : undefined);
-      const location =
-        draft.state || draft.district || draft.village
-          ? {
-              country: "India",
-              state: draft.state || undefined,
-              district: draft.district || undefined,
-              village: draft.village || undefined,
-            }
-          : undefined;
+      const location = nagpurPlace;
       const name = draft.name.trim() || "My farm";
       if (!farm)
         farm = await executeCommand(
@@ -227,26 +223,12 @@ export function Setup() {
                 autoComplete="name"
               />
             </Field>
-            <div className="form-grid">
-              <Field label="State (optional)">
-                <input
-                  value={draft.state}
-                  onChange={(e) => patch({ state: e.target.value })}
-                />
-              </Field>
-              <Field label="District (optional)">
-                <input
-                  value={draft.district}
-                  onChange={(e) => patch({ district: e.target.value })}
-                />
-              </Field>
-            </div>
-            <Field label="Village or locality (optional)">
-              <input
-                value={draft.village}
-                onChange={(e) => patch({ village: e.target.value })}
-              />
-            </Field>
+            <p>
+              Sakha covers Nagpur district, Maharashtra. District forecast and
+              rainfall use the public grid point 21.15° N, 79.1° E. That point
+              is not a surveyed field, and another district does not have a
+              checked forecast bulletin in this version.
+            </p>
             <p className="muted">
               English is available. No account, password or OTP is needed.
             </p>
@@ -566,41 +548,13 @@ export function LocationEdit({
   onClose: () => void;
 }) {
   const mutation = useCommand("updateFarm", { farmId: farm.id });
-  const [state, setState] = useState(farm.location?.state ?? "");
-  const [district, setDistrict] = useState(farm.location?.district ?? "");
-  const [village, setVillage] = useState(farm.location?.village ?? "");
-  const [lat, setLat] = useState(farm.location?.latitude?.toString() ?? "");
-  const [lon, setLon] = useState(farm.location?.longitude?.toString() ?? "");
   const [error, setError] = useState<unknown>();
   const save = async () => {
     setError(undefined);
     try {
-      if (Boolean(lat) !== Boolean(lon))
-        throw new Error(
-          "Provide both latitude and longitude, or leave both blank.",
-        );
-      if (
-        lat &&
-        (!Number.isFinite(Number(lat)) ||
-          Number(lat) < -90 ||
-          Number(lat) > 90 ||
-          !Number.isFinite(Number(lon)) ||
-          Number(lon) < -180 ||
-          Number(lon) > 180)
-      )
-        throw new Error(
-          "Coordinates must be valid latitude and longitude numbers.",
-        );
       await mutation.mutateAsync({
         expected_version: farm.version,
-        location: {
-          country: farm.location?.country ?? "India",
-          state: state || undefined,
-          district: district || undefined,
-          village: village || undefined,
-          latitude: lat ? Number(lat) : undefined,
-          longitude: lon ? Number(lon) : undefined,
-        },
+        location: nagpurPlace,
       });
       onClose();
     } catch (e) {
@@ -609,43 +563,15 @@ export function LocationEdit({
   };
   return (
     <>
-      <div className="form-grid">
-        <Field label="State">
-          <input value={state} onChange={(e) => setState(e.target.value)} />
-        </Field>
-        <Field label="District">
-          <input
-            value={district}
-            onChange={(e) => setDistrict(e.target.value)}
-          />
-        </Field>
-      </div>
-      <Field label="Village or locality">
-        <input value={village} onChange={(e) => setVillage(e.target.value)} />
-      </Field>
-      <div className="form-grid">
-        <Field label="Latitude (optional)">
-          <input
-            value={lat}
-            onChange={(e) => setLat(e.target.value)}
-            type="number"
-            step="any"
-          />
-        </Field>
-        <Field label="Longitude (optional)">
-          <input
-            value={lon}
-            onChange={(e) => setLon(e.target.value)}
-            type="number"
-            step="any"
-          />
-        </Field>
-      </div>
-      <State title="Gridded rainfall needs a reported point">
-        Coordinates select a regional grid estimate. Sakha does not guess
-        coordinates from a village name or treat grid rainfall as a field
-        measurement.
-      </State>
+      <p>
+        Sakha covers Nagpur district, Maharashtra. The district forecast and
+        rainfall charts are the captured official records for 21.15° N, 79.1° E.
+        That is a public grid point, not a surveyed field.
+      </p>
+      <p className="muted">
+        Another district does not load a forecast bulletin. Crop and water
+        details stay the facts you record.
+      </p>
       <ErrorNotice error={error} />
       <div className="actions">
         <button
@@ -654,10 +580,10 @@ export function LocationEdit({
           disabled={mutation.isPending}
           onClick={() => void save()}
         >
-          Confirm location update
+          Use Nagpur evidence
         </button>
         <button type="button" className="button secondary" onClick={onClose}>
-          Cancel
+          Close
         </button>
       </div>
     </>
@@ -700,7 +626,6 @@ export function FarmPage() {
           Update my farm
         </button>
       </PageHeading>
-      <Banner text="Same land. A clearer picture of your farm." />
       <Card
         title="Farm profile"
         action={
@@ -709,7 +634,7 @@ export function FarmPage() {
             className="text-link"
             onClick={() => setLocation(true)}
           >
-            Edit location
+            Nagpur coverage
           </button>
         }
       >
@@ -739,7 +664,7 @@ export function FarmPage() {
             <dd>{factValue(list, "situation")}</dd>
           </div>
           <div>
-            <dt>Reported coordinates</dt>
+            <dt>Nagpur rainfall grid</dt>
             <dd>
               {farm.data?.location?.latitude !== undefined
                 ? `${farm.data.location.latitude}, ${farm.data.location.longitude}`
