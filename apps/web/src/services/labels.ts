@@ -1,13 +1,9 @@
 const roleNames: Record<string, string> = {
-  chief_of_staff: "Ask Sakha",
-  climate: "Climate",
-  weather: "Weather",
-  crop_planning: "Crop planning",
-  crop_care: "Crop care",
-  water: "Water",
-  market: "Market",
-  farm_finance: "Farm finance",
-  government_support: "Government support",
+  sakha: "Sakha",
+  megha: "Megha",
+  jal: "Jal",
+  kheti: "Kheti",
+  paisa: "Paisa",
 };
 
 export function roleLabel(key: string) {

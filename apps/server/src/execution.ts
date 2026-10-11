@@ -2,7 +2,29 @@ import { createHash } from "node:crypto";
 import { peerGrants, roleDirectory } from "@sakha/agents-farming";
 import * as c from "@sakha/contracts";
 import type { createCoreServices } from "@sakha/core";
-import { authorize, type Runtime, type RuntimeTurn } from "@sakha/core";
+import {
+  activeSpecialists,
+  admitConsult,
+  authorize,
+  beginLedger,
+  type ConsultLedger,
+  type ConsultReply,
+  canonicalizeSpecialist,
+  cardFromSources,
+  charterInstructions,
+  ensureCited,
+  fetchPage as fetchPublicPage,
+  mergeCards,
+  planTurn,
+  type Runtime,
+  type RuntimeTurn,
+  registerHandoff,
+  sakhaChatEnabled,
+  sakhaReview,
+  searchWeb as searchPublic,
+  specialistLabels,
+  specialistNote,
+} from "@sakha/core";
 import type { createDataServices } from "@sakha/data";
 import type { createDomainServices, createFarmServices } from "@sakha/farm";
 import { assertMutationAllowed, DomainError, load } from "@sakha/farm";
@@ -10,6 +32,19 @@ import { z } from "zod";
 import type { createLifecycle } from "./lifecycle.js";
 import type { Storage } from "./storage/database.js";
 
+type TurnScratch = {
+  citations: c.WebCitation[];
+  specialists: c.RoleKey[];
+  cards: c.TeamCard[];
+  ledger: ConsultLedger;
+};
+const moneyKinds = new Set([
+  "market_proceeds",
+  "sale_storage",
+  "crop_budget",
+  "financial_comparison",
+  "scheme_checklist",
+]);
 type Services = {
   store: Storage;
   farm: ReturnType<typeof createFarmServices>;
@@ -21,6 +56,10 @@ type Services = {
 export function createExecution(
   services: Services,
   runtime: Runtime | undefined,
+  web: {
+    search?: typeof searchPublic;
+    fetch?: typeof fetchPublicPage;
+  } = {},
 ) {
   const { store, farm, core, domain, lifecycle } = services;
   const active = new Map<string, AbortController>();
@@ -47,17 +86,12 @@ export function createExecution(
     assertMutationAllowed(store, run.farm_id);
     const grants = store
       .list("consent", run.farm_id)
-      .map((x) => c.Consent.parse(x))
-      .filter(
-        (x) =>
-          x.status === "active" &&
-          x.external_processing &&
-          x.roles.includes(run.role_key),
-      );
-    if (!grants.some((g) => g.fields.includes("conversation")))
+      .map((x) => c.Consent.parse(x));
+    const allowed = sakhaChatEnabled(grants);
+    if (!allowed)
       throw new DomainError(
         "consent_required",
-        "Allow external processing of conversation text for this specialist before sending a turn",
+        "Turn on team chat once: allow external processing of conversation text.",
       );
     return core.contextFacts(run.farm_id, run.role_key, true, run.field_id);
   }
@@ -68,7 +102,12 @@ export function createExecution(
     roleKey: run.role_key,
     runId: run.id,
   });
-  const check = (run: c.Run, action: string, allowed = true) => {
+  const check = (
+    run: c.Run,
+    action: string,
+    allowed = true,
+    scope?: { domain?: string; specialist?: string; namespace?: string },
+  ) => {
     if (
       stopped ||
       current(run).state !== "running" ||
@@ -80,12 +119,30 @@ export function createExecution(
       action,
       { id: run.id, farmId: run.farm_id },
       allowed,
+      false,
+      scope,
     );
   };
+  function specialistSources(specialist: c.RoleKey) {
+    return (
+      roleDirectory().find((role) => role.key === specialist)?.source_ids ?? []
+    );
+  }
+  function remember(
+    scratch: TurnScratch | undefined,
+    items: c.WebCitation[],
+    specialist?: c.RoleKey,
+  ) {
+    if (!scratch) return;
+    for (const item of items)
+      if (!scratch.citations.some((existing) => existing.url === item.url))
+        scratch.citations.push(item);
+    if (specialist && !scratch.specialists.includes(specialist))
+      scratch.specialists.push(specialist);
+  }
   function evidence(run: c.Run, query: { source_id?: string; text?: string }) {
     const role = roleDirectory().find((x) => x.key === run.role_key);
-    const allowed =
-      run.role_key === "chief_of_staff" ? undefined : role?.source_ids;
+    const allowed = run.role_key === "sakha" ? undefined : role?.source_ids;
     return store
       .list("evidence", run.farm_id)
       .map((x) => c.Evidence.parse(x))
@@ -175,14 +232,57 @@ export function createExecution(
   function tools(
     run: c.Run,
     onEvidence?: (items: c.Evidence[]) => void,
+    scratch?: TurnScratch,
   ): RuntimeTurn["tools"] {
+    const ledger = scratch?.ledger ?? beginLedger();
+    async function consult(
+      specialist: string,
+      question: string,
+    ): Promise<ConsultReply> {
+      const canonical = canonicalizeSpecialist(specialist);
+      const decision = admitConsult(ledger, canonical ?? specialist, question);
+      if (!decision.ok)
+        return {
+          specialist: canonical ?? specialist,
+          notes: decision.reason,
+          citations: [],
+          evidence_ids: [],
+          stopped: decision.reason,
+        };
+      if (!canonical)
+        return {
+          specialist,
+          notes: "Unknown teammate.",
+          citations: [],
+          evidence_ids: [],
+          stopped: "unknown teammate",
+        };
+      check(run, "consult", true, { specialist: canonical });
+      const saved = evidence(run, {}).filter((item) => {
+        const sources = specialistSources(canonical);
+        return sources.length === 0 || sources.includes(item.source_id);
+      });
+      const hits = await (web.search ?? searchPublic)(question);
+      remember(scratch, hits, canonical);
+      const card = sakhaReview(cardFromSources(canonical, question, hits)).card;
+      if (card.handoff_suggestion)
+        registerHandoff(ledger, card.handoff_suggestion.to);
+      scratch?.cards.push(card);
+      return {
+        specialist: canonical,
+        notes: specialistNote(canonical, question, saved, hits),
+        citations: hits,
+        evidence_ids: saved.map((item) => item.id),
+        card,
+      };
+    }
     return {
       readFacts: async () => {
         check(run, "read");
         return authorizeSend(run);
       },
       recallMemory: async (query) => {
-        check(run, "memory");
+        check(run, "memory", true, { namespace: run.role_key });
         const facts = authorizeSend(run);
         const versions = new Map(facts.map((x) => [x.id, x.version]));
         const terms = query.match(/[\p{L}\p{N}_]+/gu)?.slice(0, 12) ?? [];
@@ -227,13 +327,14 @@ export function createExecution(
           field_id: run.field_id,
           role_key: run.role_key,
         });
+        if (moneyKinds.has(request.kind)) check(run, "market");
         refs(run, request.evidence);
         return c.Scenario.parse(
           domain.execute("createScenario", request, { farmId: run.farm_id }),
         );
       },
       proposePlan: async (input) => {
-        check(run, "propose", run.role_key === "chief_of_staff");
+        check(run, "propose", run.role_key === "sakha");
         const request = c.operations.createPlanRevision.input.parse({
           ...z.record(z.string(), z.unknown()).parse(input),
           farm_id: run.farm_id,
@@ -343,19 +444,113 @@ export function createExecution(
         });
         return { id, status: "queued" };
       },
+      searchWeb: async (query) => {
+        check(run, "web_search");
+        const hits = await (web.search ?? searchPublic)(query);
+        remember(scratch, hits);
+        return hits;
+      },
+      fetchPage: async (url) => {
+        let domain = "";
+        try {
+          domain = new URL(url).hostname.toLowerCase();
+        } catch {
+          throw new DomainError("validation", "Page address is not a URL");
+        }
+        check(run, "fetch_page", true, { domain });
+        const page = await (web.fetch ?? fetchPublicPage)(url);
+        remember(scratch, [page]);
+        return page;
+      },
+      consultSpecialist: consult,
+      dailyBrief: async (question) => {
+        ledger.daily = true;
+        try {
+          return await Promise.all(
+            activeSpecialists.map((id) => consult(id, question)),
+          );
+        } finally {
+          ledger.daily = false;
+        }
+      },
+      remember: async (key, value) => {
+        const safeKey = key.slice(0, 80);
+        if (safeKey.startsWith("profile.")) check(run, "write_profile");
+        else check(run, "memory", true, { namespace: run.role_key });
+        const facts = authorizeSend(run);
+        const memory = {
+          ...farm.makeBase(run.farm_id),
+          role_key: run.role_key,
+          field_id: run.field_id,
+          text: `${safeKey}=${value.slice(0, 500)}`,
+          fact_versions: Object.fromEntries(
+            facts.map((item) => [item.id, item.version]),
+          ),
+          origin_run: run.id,
+        };
+        store.put("memory", memory);
+        store.db
+          .prepare(
+            "INSERT INTO memory_fts(id,farm_id,role_key,content) VALUES(?,?,?,?)",
+          )
+          .run(memory.id, run.farm_id, run.role_key, memory.text);
+        return { key: safeKey };
+      },
+      recordWork: async () => {
+        check(run, "record_work");
+      },
+    };
+  }
+  async function consultAsLead(
+    run: c.Run,
+    specialist: c.RoleKey,
+    question: string,
+  ): Promise<ConsultReply> {
+    const canonical = canonicalizeSpecialist(specialist);
+    if (!canonical)
+      return {
+        specialist,
+        notes: "Unknown teammate.",
+        citations: [],
+        evidence_ids: [],
+        stopped: "unknown teammate",
+      };
+    authorize(
+      {
+        kind: "agent",
+        id: "sakha",
+        farmId: run.farm_id,
+        roleKey: "sakha",
+        runId: run.id,
+      },
+      "consult",
+      { id: run.id, farmId: run.farm_id },
+      true,
+      false,
+      { specialist: canonical },
+    );
+    const hits = await (web.search ?? searchPublic)(question);
+    const card = sakhaReview(cardFromSources(canonical, question, hits)).card;
+    return {
+      specialist: canonical,
+      notes: specialistNote(canonical, question, [], hits),
+      citations: hits,
+      evidence_ids: [],
+      card,
     };
   }
   async function runTurn(run: c.Run) {
     if (run.state !== "queued") return;
     const controller = new AbortController();
     active.set(run.id, controller);
+    const scratch: TurnScratch = {
+      citations: [],
+      specialists: [],
+      cards: [],
+      ledger: beginLedger(),
+    };
     let message: c.Message | undefined;
     try {
-      if (!runtime || (await runtime.getCapabilities()).ready !== true)
-        throw new DomainError(
-          "unavailable",
-          "Configure a supported agent runtime before sending a turn",
-        );
       const facts = authorizeSend(run);
       const allowedIds = new Set(facts.map((x) => x.id));
       const messages = store
@@ -368,13 +563,11 @@ export function createExecution(
               allowedIds.has(id),
             ),
         );
+      const farmerText =
+        [...messages].reverse().find((item) => item.author === "farmer")
+          ?.text ?? "";
+      const plan = planTurn(farmerText);
       run = state(run, "running");
-      store.put("agent_instance", {
-        ...farm.makeBase(run.farm_id),
-        id: run.role_key,
-        role_key: run.role_key,
-        runtime: (await runtime.getCapabilities()).version,
-      });
       message = c.Message.parse({
         ...farm.makeBase(run.farm_id),
         field_id: run.field_id,
@@ -391,12 +584,53 @@ export function createExecution(
         },
       });
       store.put("message", message);
+      if (plan.guard !== "farm") {
+        const refusal = plan.refusal ?? "I only help with your farm.";
+        const card = sakhaReview(
+          cardFromSources(run.role_key, farmerText || refusal, [], now()),
+        ).card;
+        message = {
+          ...message,
+          text: refusal,
+          status: "final",
+          context: {
+            ...message.context,
+            consulted: [],
+            reviewed_by: "sakha",
+            card: { ...card, why: refusal, out_of_scope: true },
+          },
+          version: message.version + 1,
+          updated_at: now(),
+        };
+        const refusalMessage = message;
+        store.transaction(() => {
+          store.put("message", refusalMessage);
+          state(current(run), "completed");
+          store.event(run.farm_id, "message_final", {
+            record_id: refusalMessage.id,
+            run_id: run.id,
+            message: refusalMessage,
+          });
+        });
+        return;
+      }
+      if (!runtime || (await runtime.getCapabilities()).ready !== true)
+        throw new DomainError(
+          "unavailable",
+          "Configure a supported agent runtime before sending a turn",
+        );
+      store.put("agent_instance", {
+        ...farm.makeBase(run.farm_id),
+        id: run.role_key,
+        role_key: run.role_key,
+        runtime: (await runtime.getCapabilities()).version,
+      });
       let sequence = 0;
       const result = await runtime.startTurn({
         run,
         messages,
         facts,
-        instructions: `${roleDirectory().find((x) => x.key === run.role_key)?.description}. Use only scoped Sakha tools. Look up actual evidence before claims. Start with lookup_evidence({}) to discover saved records for this role and farm, then select relevant source IDs. The optional text filter is a literal substring, not semantic search. An empty filtered result does not mean the farm has no evidence; retry without text before reporting evidence unavailable. Source dates, crop stage, local applicability and missing measurements matter. Do not invent coefficients, eligibility, volumes, prices or percentages. Calculations use calculate_scenario. Only Chief of Staff proposes integrated plans. Never approve plans, save farmer facts or record actual work. Ask one concrete clarification if blocked. A peer request acknowledges queueing, not an answer.`,
+        instructions: charterInstructions(run.role_key),
         signal: controller.signal,
         tools: tools(run, (items) => {
           if (!message) return;
@@ -458,10 +692,48 @@ export function createExecution(
         },
       });
       if (current(run).state === "running" && message) {
+        if (run.role_key !== "sakha") {
+          const reviewed = sakhaReview(
+            cardFromSources(
+              run.role_key,
+              result.text,
+              scratch.citations,
+              now(),
+            ),
+          );
+          scratch.cards.push(reviewed.card);
+          const handoff = reviewed.card.handoff_suggestion;
+          if (handoff && scratch.ledger.calls === 0) {
+            const extra = await consultAsLead(run, handoff.to, handoff.reason);
+            remember(scratch, extra.citations, handoff.to);
+            if (extra.card) scratch.cards.push(extra.card);
+          }
+        }
+        let text = ensureCited(result.text, scratch.citations);
+        const names = scratch.specialists.map(
+          (id) => specialistLabels[id as keyof typeof specialistLabels] ?? id,
+        );
+        const chip =
+          run.role_key === "sakha"
+            ? `Reviewed by Sakha${names.length ? ` · consulted ${names.join(", ")}` : ""}`
+            : "Checked by Sakha";
+        if (!text.includes(chip)) text = `${text.trim()}\n\n${chip}`;
+        const card = scratch.cards.length
+          ? mergeCards(scratch.cards)
+          : sakhaReview(
+              cardFromSources(run.role_key, text, scratch.citations, now()),
+            ).card;
         message = {
           ...message,
-          text: result.text,
+          text,
           status: "final",
+          context: {
+            ...message.context,
+            citations: scratch.citations,
+            consulted: scratch.specialists,
+            reviewed_by: "sakha",
+            card,
+          },
           version: message.version + 1,
           updated_at: now(),
         };
@@ -473,7 +745,7 @@ export function createExecution(
             ...farm.makeBase(run.farm_id),
             role_key: run.role_key,
             field_id: run.field_id,
-            text: result.text.slice(0, 8000),
+            text: text.slice(0, 8000),
             fact_versions: Object.fromEntries(
               facts.map((x) => [x.id, x.version]),
             ),
@@ -644,7 +916,7 @@ export function createExecution(
             summary:
               "Review the approved plan against corrected facts or changed privacy grants. Its commitments and recorded work remain unchanged.",
             severity: "advisory",
-            role_key: "chief_of_staff",
+            role_key: "sakha",
             status: "active",
             evidence: [],
             issued_at: now(),

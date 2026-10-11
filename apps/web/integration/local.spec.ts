@@ -109,7 +109,7 @@ test("browser setup, attributed correction, scoped chat, restart and protected e
       .external_processing,
   ).toBe(true);
   const roleResponse = await page.request.get(
-    `${origin}/api/v1/farms/${farm.id}/agents/chief_of_staff`,
+    `${origin}/api/v1/farms/${farm.id}/agents/sakha`,
     { headers: { "x-sakha-session": services.sessionToken } },
   );
   expect(
@@ -171,7 +171,7 @@ test("real plan approval stays separate from actual completed work", async ({
             ...services.farm.makeBase(farm.id),
             title: "Inspect field",
             description: "Record work separately",
-            role_key: "crop_care",
+            role_key: "kheti",
             status: "proposed",
             evidence: [],
           },
@@ -222,7 +222,7 @@ test("mobile specialists, local photo lifecycle, alert acknowledgement and full-
     expect(response.status()).toBe(200);
     expect(c.Role.parse((await response.json()).data).key).toBe(roleKey);
   }
-  await page.goto(`${origin}/agents/crop_care`);
+  await page.goto(`${origin}/agents/kheti`);
   await page
     .getByText("Explore specialist tools and scenarios", { exact: true })
     .click();
@@ -264,7 +264,7 @@ test("mobile specialists, local photo lifecycle, alert acknowledgement and full-
     title: "Synthetic integration alert",
     summary: "No weather warning asserted",
     severity: "information",
-    role_key: "weather",
+    role_key: "megha",
     status: "active",
     evidence: [],
     issued_at: now,

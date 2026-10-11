@@ -640,14 +640,13 @@ export function createDataServices(
         crops: input.crops,
         definition: input.definition,
       });
-      const role = input.source_id.startsWith("W")
-        ? "weather"
-        : input.source_id.startsWith("G")
-          ? "government_support"
-          : input.source_id === "A01"
-            ? "crop_planning"
+      const role =
+        input.source_id.startsWith("W") || input.source_id.startsWith("C")
+          ? "megha"
+          : input.source_id.startsWith("G") || input.source_id.startsWith("M")
+            ? "paisa"
             : input.source_id.startsWith("A")
-              ? "crop_care"
+              ? "kheti"
               : undefined;
       if (role) {
         const finding = c.Finding.parse({

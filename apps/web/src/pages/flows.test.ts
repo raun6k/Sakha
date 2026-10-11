@@ -51,7 +51,7 @@ describe("conversation interaction", () => {
     const service = createFixtureService();
     const execute = vi.spyOn(service, "execute");
     const roles = await service.execute("listAgents", { input: {} });
-    const role = roles.find((r) => r.key === "chief_of_staff") as Role;
+    const role = roles.find((r) => r.key === "sakha") as Role;
     mount(h(ConversationView, { role }), service, {
       pathname: "/ask",
       state: { question: "How should I plan?", questionId: "home-1" },
@@ -229,15 +229,13 @@ describe("evidence and privacy interactions", () => {
       execute.mock.calls.some(([name]) => name === "requestDeletion"),
     ).toBe(false);
   });
-  it("directory contains eight specialists and keeps A0 separate", async () => {
+  it("directory lists the four teammates and keeps Sakha on Ask", async () => {
     mount(h(AgentsPage));
-    await screen.findByRole("heading", { name: "Water & Irrigation" });
+    await screen.findByRole("heading", { name: "Jal" });
     expect(
       screen.getAllByRole("link", { name: "Chat with specialist" }),
-    ).toHaveLength(8);
-    expect(
-      screen.queryByRole("heading", { name: "Chief of Staff" }),
-    ).toBeNull();
+    ).toHaveLength(4);
+    expect(screen.queryByRole("heading", { name: "Sakha" })).toBeNull();
     expect(screen.getByRole("link", { name: "Ask Sakha" })).toBeTruthy();
   });
 });
@@ -282,11 +280,7 @@ it("allows general specialist conversations without requiring optional private f
   )?.[1];
   expect(request?.input).toMatchObject({
     external_processing: true,
-    roles: expect.arrayContaining([
-      "chief_of_staff",
-      "farm_finance",
-      "government_support",
-    ]),
+    roles: expect.arrayContaining(["sakha", "paisa"]),
     fields: expect.arrayContaining(["conversation", "F01", "F03", "F04"]),
   });
   expect(request?.input).toMatchObject({
@@ -305,7 +299,7 @@ describe("demo navigation and welcome", () => {
     await screen.findByRole("heading", {
       name: /Good morning|Good afternoon|Good evening/,
     });
-    expect(document.querySelectorAll(".role-card-compact")).toHaveLength(9);
+    expect(document.querySelectorAll(".role-card-compact")).toHaveLength(5);
     expect(document.querySelector(".home-hero")?.textContent).not.toContain(
       "validation",
     );
@@ -317,11 +311,11 @@ describe("demo navigation and welcome", () => {
       screen.getByRole("button", { name: "Agents", expanded: false }),
     );
     await waitFor(() =>
-      expect(document.querySelectorAll("#sidebar-agents a")).toHaveLength(10),
+      expect(document.querySelectorAll("#sidebar-agents a")).toHaveLength(6),
     );
     expect(
       document.querySelector(
-        '#sidebar-agents a[href="/agents/climate?tab=chat"]',
+        '#sidebar-agents a[href="/agents/megha?tab=chat"]',
       ),
     ).not.toBeNull();
     await user.click(

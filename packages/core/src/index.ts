@@ -12,6 +12,7 @@ import {
   requireVersion,
   type Store,
 } from "@sakha/farm";
+import type { ConsultReply } from "./orchestration.js";
 export type BoundPrincipal = {
   kind: "farmer" | "agent";
   id: string;
@@ -33,48 +34,102 @@ if (
 )
   throw new Error("Invalid Sakha authorization policy");
 export const roleFactCategories: Record<c.RoleKey, readonly string[]> = {
-  chief_of_staff: ["F01", "F02", "F03", "F04", "F05", "F06", "F07", "F08"],
-  climate: ["F01", "F03", "F04"],
-  weather: ["F01", "F03", "F06"],
-  crop_planning: ["F01", "F02", "F03", "F04", "F05"],
-  crop_care: ["F01", "F02", "F03", "F04", "F06"],
-  water: ["F01", "F02", "F03", "F04"],
-  market: ["F01", "F03", "F07"],
-  farm_finance: ["F01", "F03", "F05", "F07"],
-  government_support: ["F01", "F03", "F06", "F08"],
+  sakha: ["F01", "F02", "F03", "F04", "F05", "F06", "F07", "F08"],
+  megha: ["F01", "F03", "F04", "F06"],
+  jal: ["F01", "F02", "F03", "F04"],
+  kheti: ["F01", "F02", "F03", "F04", "F05", "F06"],
+  paisa: ["F01", "F03", "F05", "F06", "F07", "F08"],
 };
+export type AuthorizationScope = {
+  domain?: string;
+  specialist?: string;
+  namespace?: string;
+};
+export type AuthorizationDecision = {
+  decision: "allow" | "deny";
+  action: string;
+  principal: string;
+  resource: string;
+  domain: string;
+  specialist: string;
+  reason: string;
+  at: string;
+};
+const authorizationDecisions: AuthorizationDecision[] = [];
+export function authorizationLog(): readonly AuthorizationDecision[] {
+  return authorizationDecisions;
+}
+function recordDecision(entry: AuthorizationDecision) {
+  authorizationDecisions.push(entry);
+  if (authorizationDecisions.length > 400) authorizationDecisions.shift();
+  if (entry.decision === "deny")
+    console.warn(
+      `Cedar denied ${entry.action} for ${entry.principal} on ${entry.resource}${entry.domain ? ` (${entry.domain})` : ""}`,
+    );
+}
 export function authorize(
   principal: BoundPrincipal,
   action: string,
   resource: { id: string; farmId: string; private?: boolean },
   allowed: boolean,
   privateGrant = false,
+  scope: AuthorizationScope = {},
 ) {
   const principalType =
     principal.kind === "farmer" ? "Sakha::Farmer" : "Sakha::Agent";
   const principalUid = { type: principalType, id: principal.id };
   const resourceUid = { type: "Sakha::Resource", id: resource.id };
+  const domain = scope.domain ?? "";
+  const specialist = scope.specialist ?? "";
   const result = isAuthorized({
     schema: policySchema,
     validateRequest: true,
     principal: principalUid,
     action: { type: "Sakha::Action", id: action },
     resource: resourceUid,
-    context: { allowed, privateGrant },
+    context: { allowed, privateGrant, domain, specialist },
     policies: { staticPolicies: policyText },
     entities: [
-      { uid: principalUid, attrs: { farm: principal.farmId }, parents: [] },
+      {
+        uid: principalUid,
+        attrs:
+          principal.kind === "agent"
+            ? {
+                farm: principal.farmId,
+                role: principal.roleKey ?? "unspecified",
+              }
+            : { farm: principal.farmId },
+        parents: [],
+      },
       {
         uid: resourceUid,
-        attrs: { farm: resource.farmId, private: resource.private ?? false },
+        attrs: {
+          farm: resource.farmId,
+          private: resource.private ?? false,
+          namespace: scope.namespace ?? "",
+        },
         parents: [],
       },
     ],
   });
-  if (result.type !== "success" || result.response.decision !== "allow")
+  const denied =
+    result.type !== "success" || result.response.decision !== "allow";
+  recordDecision({
+    decision: denied ? "deny" : "allow",
+    action,
+    principal: principal.id,
+    resource: resource.id,
+    domain,
+    specialist,
+    reason: denied ? "deny" : "allow",
+    at: new Date().toISOString(),
+  });
+  if (denied)
     throw new DomainError(
       "permission_denied",
-      "The scoped operation is not permitted",
+      `Cedar denied ${action}. The scoped operation is not permitted`,
+      false,
+      { decision: "deny", action, domain, specialist },
     );
 }
 export type RuntimeCapabilities = {
@@ -110,8 +165,55 @@ export type RuntimeTurn = {
       text: string,
     ) => Promise<{ id: string; status: string }>;
     clarify: (question: string) => Promise<void>;
+    searchWeb: (query: string) => Promise<c.WebCitation[]>;
+    fetchPage: (url: string) => Promise<c.WebCitation>;
+    consultSpecialist: (
+      specialist: string,
+      question: string,
+    ) => Promise<ConsultReply>;
+    dailyBrief: (question: string) => Promise<ConsultReply[]>;
+    remember: (key: string, value: string) => Promise<{ key: string }>;
+    recordWork: (description: string) => Promise<void>;
   };
 };
+export {
+  type ActiveSpecialist,
+  activeSpecialists,
+  admitConsult,
+  beginLedger,
+  type ConsultLedger,
+  type ConsultReply,
+  canonicalizeSpecialist,
+  cardFromSources,
+  charterInstructions,
+  ensureCited,
+  farmerFacingChecks,
+  isActiveSpecialist,
+  MAX_HOPS,
+  MAX_REVISIONS,
+  MAX_SPECIALIST_CALLS,
+  mergeCards,
+  type PromptRoute,
+  planTurn,
+  registerHandoff,
+  routeFarmerPrompt,
+  sakhaChatEnabled,
+  sakhaInstructions,
+  sakhaReview,
+  sakhaRole,
+  specialistLabels,
+  specialistNote,
+  suggestHandoff,
+  TURN_BUDGET_MS,
+  type TurnPlan,
+} from "./orchestration.js";
+export {
+  domainAllowed,
+  FETCH_DOMAINS,
+  fetchPage,
+  searchWeb,
+  type WebDeps,
+} from "./web-research.js";
 export interface Runtime {
   getCapabilities(): Promise<RuntimeCapabilities>;
   startTurn(turn: RuntimeTurn): Promise<{ text: string }>;

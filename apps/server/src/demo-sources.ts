@@ -111,7 +111,7 @@ export function importDemoSources(
       "finding",
       c.Finding.parse({
         ...services.farm.makeBase(farmId),
-        role_key: "weather",
+        role_key: "megha",
         title: "Dry district forecast",
         summary:
           "IMD lists no rain for Nagpur, 10–16 October. District forecast; field conditions can differ.",
@@ -134,7 +134,7 @@ export function importDemoSources(
       "finding",
       c.Finding.parse({
         ...services.farm.makeBase(farmId),
-        role_key: "climate",
+        role_key: "megha",
         title: `RONI ${latest.value !== null && latest.value >= 0 ? "+" : ""}${latest.value} °C`,
         summary: `Latest published relative Niño index, ${new Date(latest.time).toLocaleDateString("en-IN", { month: "short", year: "numeric", timeZone: "UTC" })}. A Pacific climate indicator, not a local rainfall prediction.`,
         evidence: [ref(evidenceFor(roni.evidence_id ?? ""))],

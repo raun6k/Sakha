@@ -50,7 +50,7 @@ export function HomePage() {
     evidence?: Finding["evidence"];
   }[] = [
     {
-      role: "weather",
+      role: "megha",
       evidence: home.sections.weather[0]?.evidence,
       title: "Weather",
       value: home.sections.weather[0]?.evidence.some(
@@ -63,19 +63,19 @@ export function HomePage() {
         "A supported local forecast is needed.",
     },
     {
-      role: "crop_care",
+      role: "kheti",
       title: "Crop status",
       value: factValue(facts, "crop_stage"),
       description: factValue(facts, "current_crop"),
     },
     {
-      role: "water",
+      role: "jal",
       title: "Water situation",
       value: factValue(facts, "water_availability"),
       description: factValue(facts, "water_source"),
     },
     {
-      role: "climate",
+      role: "megha",
       evidence: home.sections.climate[0]?.evidence,
       title: "El Niño outlook",
       value: home.sections.climate[0]?.title ?? "Information unavailable",

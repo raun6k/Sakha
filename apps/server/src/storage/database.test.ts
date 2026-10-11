@@ -126,15 +126,11 @@ describe("authoritative farm storage", () => {
     ).toThrow("Reload");
     services.execute(
       "updatePreferences",
-      { version: 1, role_key: "water", explanation: "detailed" },
-      { farmId: a.id, roleKey: "water" },
+      { version: 1, role_key: "jal", explanation: "detailed" },
+      { farmId: a.id, roleKey: "jal" },
     );
     expect(
-      services.execute(
-        "getPreferences",
-        {},
-        { farmId: b.id, roleKey: "water" },
-      ),
+      services.execute("getPreferences", {}, { farmId: b.id, roleKey: "jal" }),
     ).toMatchObject({ explanation: "inherit" });
     expect(() =>
       services.execute("getFarm", {}, { farmId: "foreign" }),

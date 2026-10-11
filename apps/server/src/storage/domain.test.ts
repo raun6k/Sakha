@@ -42,7 +42,7 @@ function proposal(
         updated_at: now,
         title: "Inspect field",
         description: "Record work separately",
-        role_key: "crop_care",
+        role_key: "kheti",
         status: "proposed",
         evidence: [],
       },
@@ -173,7 +173,7 @@ describe("plan and actual work lifecycle", () => {
         "createScenario",
         {
           farm_id: id,
-          role_key: "farm_finance",
+          role_key: "paisa",
           kind: "financial_comparison",
           inputs: {
             cost: { minor_units: 10000, currency: "INR" },
@@ -218,7 +218,7 @@ it("converts explicit depth and area to volume without inventing crop demand", (
   const { domain, store, id } = context();
   const base = {
     farm_id: id,
-    role_key: "water",
+    role_key: "jal",
     kind: "irrigation_allocation",
     assumptions: ["Supplied scenario values only"],
     evidence: [],
@@ -263,7 +263,7 @@ it("uses supplied kg price and costs with a distinct proceeds method", () => {
     "createScenario",
     {
       farm_id: id,
-      role_key: "market",
+      role_key: "paisa",
       kind: "market_proceeds",
       inputs: {
         quantity: { kind: "known", value: 2, unit: "quintal" },
@@ -287,7 +287,7 @@ it("inherits critical finding constraints and blocks unverified water tasks", ()
   const { domain, store, farm, id, now } = context();
   const finding = {
     ...farm.makeBase(id),
-    role_key: "water",
+    role_key: "jal",
     title: "Fixture water uncertainty",
     summary: "Demand is unknown",
     evidence: [],
@@ -310,7 +310,7 @@ it("inherits critical finding constraints and blocks unverified water tasks", ()
   const data = proposal(id, now());
   data.findings = [finding.id];
   const first = data.tasks[0];
-  if (first) first.role_key = "water";
+  if (first) first.role_key = "jal";
   const revision = domain.execute("createPlanRevision", data, {
     farmId: id,
   }) as {
@@ -338,7 +338,7 @@ it("keeps monsoon and reported-damage scenarios bounded when measurements and lo
         "createScenario",
         {
           farm_id: id,
-          role_key: kind === "crop_care" ? "crop_care" : "crop_planning",
+          role_key: "kheti",
           kind,
           inputs: {
             condition: "Farmer reports dry spell or crop damage",

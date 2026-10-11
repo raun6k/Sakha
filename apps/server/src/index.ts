@@ -2,7 +2,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Runtime } from "@sakha/core";
-import { CodexRuntime } from "@sakha/runtime-codex";
+import { CodexRuntime, codexWebSearchMode } from "@sakha/runtime-codex";
 import { StrandsRuntime } from "@sakha/runtime-strands";
 import envPaths from "env-paths";
 import { createApp } from "./app.js";
@@ -19,6 +19,8 @@ mkdirSync(dirname(databasePath), { recursive: true, mode: 0o700 });
 const unlock = lockDatabase(databasePath);
 let runtime: Runtime | undefined;
 const development = import.meta.url.endsWith(".ts");
+const strandsProvider =
+  configured("SAKHA_STRANDS_PROVIDER") === "bedrock" ? "bedrock" : "openai";
 if (process.env.SAKHA_CODEX_ENABLED === "true")
   runtime = new CodexRuntime({
     enabled: true,
@@ -32,12 +34,23 @@ if (process.env.SAKHA_CODEX_ENABLED === "true")
     loaderPath: development
       ? fileURLToPath(import.meta.resolve("tsx"))
       : undefined,
+    webSearch: codexWebSearchMode(configured("SAKHA_CODEX_WEB_SEARCH")),
   });
 else
   runtime = new StrandsRuntime({
-    model: configured("SAKHA_OPENAI_MODEL") ?? "",
-    apiKey: configured("OPENAI_API_KEY"),
+    provider: strandsProvider,
+    model:
+      strandsProvider === "bedrock"
+        ? (configured("SAKHA_BEDROCK_MODEL_ID") ?? "")
+        : (configured("SAKHA_OPENAI_MODEL") ?? ""),
+    apiKey:
+      strandsProvider === "bedrock"
+        ? (configured("SAKHA_BEDROCK_API_KEY") ??
+          configured("AWS_BEARER_TOKEN_BEDROCK"))
+        : configured("OPENAI_API_KEY"),
     keyringAccount: configured("SAKHA_OPENAI_KEYRING_ACCOUNT"),
+    region: configured("AWS_REGION") ?? configured("AWS_DEFAULT_REGION"),
+    timeoutMs: 45_000,
   });
 const webDirectory = fileURLToPath(new URL("../../web/dist/", import.meta.url));
 let app: ReturnType<typeof createApp>["app"];

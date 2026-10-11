@@ -4,7 +4,13 @@ import fastifyStatic from "@fastify/static";
 import { roleDirectory } from "@sakha/agents-farming";
 import * as c from "@sakha/contracts";
 import type { Runtime } from "@sakha/core";
-import { authorize, createCoreServices } from "@sakha/core";
+import {
+  authorize,
+  createCoreServices,
+  type fetchPage,
+  sakhaChatEnabled,
+  type searchWeb,
+} from "@sakha/core";
 import { createDataServices } from "@sakha/data";
 import {
   createDomainServices,
@@ -27,6 +33,7 @@ export function createApp(options: {
   runtime?: Runtime;
   startScheduler?: boolean;
   webDirectory?: string;
+  web?: { search?: typeof searchWeb; fetch?: typeof fetchPage };
 }) {
   const store = new Storage(options.databasePath);
   const farm = createFarmServices(store, randomUUID, () =>
@@ -152,33 +159,25 @@ export function createApp(options: {
             : false;
         const roleProjection = (farmId?: string) =>
           roleDirectory(runtimeReady).map((role) => {
-            const consent = farmId
-              ? store
-                  .list("consent", farmId)
-                  .map((x) => c.Consent.parse(x))
-                  .some(
-                    (x) =>
-                      x.status === "active" &&
-                      x.external_processing &&
-                      x.roles.includes(role.key) &&
-                      x.fields.includes("conversation"),
-                  )
-              : false;
+            const grants = farmId
+              ? store.list("consent", farmId).map((x) => c.Consent.parse(x))
+              : [];
+            const consent = sakhaChatEnabled(grants);
             return {
               ...role,
               capabilities: [
-                ...role.capabilities.map((cap) =>
-                  cap.key === "chat" && runtimeReady && !consent
-                    ? {
-                        ...cap,
-                        status: "disabled" as const,
-                        reason:
-                          "Grant external processing of conversation text to this specialist",
-                        requirements: ["scoped external-processing consent"],
-                      }
-                    : cap,
-                ),
-                ...(role.key === "crop_care"
+                ...role.capabilities.map((cap) => {
+                  if (cap.key === "chat" && runtimeReady && !consent)
+                    return {
+                      ...cap,
+                      status: "disabled" as const,
+                      reason:
+                        "Turn on Sakha chat once: allow external processing of conversation text.",
+                      requirements: ["external-processing consent"],
+                    };
+                  return cap;
+                }),
+                ...(role.key === "kheti"
                   ? [
                       {
                         key: "photo_upload",
@@ -189,7 +188,7 @@ export function createApp(options: {
                       },
                     ]
                   : []),
-                ...(role.key === "market"
+                ...(role.key === "paisa"
                   ? [
                       {
                         key: "market_quotes",
@@ -210,7 +209,7 @@ export function createApp(options: {
                       },
                     ]
                   : []),
-                ...(role.key === "government_support"
+                ...(role.key === "paisa"
                   ? [
                       {
                         key: "public_guidance",
@@ -289,7 +288,7 @@ export function createApp(options: {
                     : x.freshness,
               }));
             const briefing = findings
-              .filter((x) => x.role_key === "chief_of_staff")
+              .filter((x) => x.role_key === "sakha")
               .at(-1);
             return c.Home.parse({
               farm: profile,
@@ -304,8 +303,16 @@ export function createApp(options: {
                   },
                 },
                 context: farm.listFacts(farmId),
-                climate: findings.filter((x) => x.role_key === "climate"),
-                weather: findings.filter((x) => x.role_key === "weather"),
+                climate: findings.filter(
+                  (x) =>
+                    x.role_key === "megha" &&
+                    x.evidence.some((item) => item.source_id.startsWith("C")),
+                ),
+                weather: findings.filter(
+                  (x) =>
+                    x.role_key === "megha" &&
+                    x.evidence.some((item) => item.source_id.startsWith("W")),
+                ),
                 actions: store
                   .list("task", farmId)
                   .map((x) => c.Task.parse(x))
@@ -401,7 +408,7 @@ export function createApp(options: {
       },
     });
   const services = { store, farm, core, domain, dataServices, lifecycle };
-  const execution = createExecution(services, options.runtime);
+  const execution = createExecution(services, options.runtime, options.web);
   if (options.startScheduler) execution.start();
   app.get(
     "/api/v1/farms/:farmId/exports/:jobId/download",

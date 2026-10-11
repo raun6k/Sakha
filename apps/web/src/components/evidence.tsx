@@ -432,7 +432,7 @@ export function ChartCard({
         ) : (
           <Link
             className="text-link"
-            to={`/agents/${series.source_id.startsWith("C") ? "climate" : series.source_id.startsWith("M") ? "market" : "weather"}?tab=chat&evidence=${encodeURIComponent(series.evidence_id ?? "")}&source=${series.source_id}&snapshot=${encodeURIComponent(series.snapshot_id)}&range=${selectedRange}`}
+            to={`/agents/${series.source_id.startsWith("M") ? "paisa" : series.source_id.startsWith("A") ? "kheti" : "megha"}?tab=chat&evidence=${encodeURIComponent(series.evidence_id ?? "")}&source=${series.source_id}&snapshot=${encodeURIComponent(series.snapshot_id)}&range=${selectedRange}`}
           >
             Ask the specialist
           </Link>

@@ -59,12 +59,9 @@ import { useUi } from "../state/ui";
 import { QuickUpdate } from "./farm";
 
 const category: { title: string; roles: string[] }[] = [
-  { title: "Climate & resources", roles: ["climate", "weather", "water"] },
-  { title: "Crop decisions", roles: ["crop_planning", "crop_care"] },
-  {
-    title: "Business & support",
-    roles: ["market", "farm_finance", "government_support"],
-  },
+  { title: "Weather", roles: ["megha"] },
+  { title: "Water and crops", roles: ["jal", "kheti"] },
+  { title: "Money and schemes", roles: ["paisa"] },
 ];
 export function RoleAbout({ role }: { role: Role }) {
   const [source, setSource] = useState<string>();
@@ -604,7 +601,7 @@ export function ConversationView({ role }: { role: Role }) {
               <article className={`message ${message.author}`} key={message.id}>
                 <header>
                   <RoleIcon
-                    role={message.author === "farmer" ? "crop_care" : role.key}
+                    role={message.author === "farmer" ? "kheti" : role.key}
                   />
                   <strong>
                     {message.author === "farmer" ? "You" : role.name}
@@ -786,7 +783,7 @@ export function AskPage() {
   const farmId = useFarmId();
   const q = useRead(
     "getAgent",
-    { params: { farmId, roleKey: "chief_of_staff" }, input: {} },
+    { params: { farmId, roleKey: "sakha" }, input: {} },
     Boolean(farmId),
   );
   const role = q.data;
@@ -861,7 +858,7 @@ function PreferencesForm({ initial }: { initial: Preferences }) {
           <option value="detailed">Detailed</option>
         </select>
       </Field>
-      {role === "climate" ? (
+      {role === "megha" ? (
         <Field
           label="Planning horizon"
           hint="A year-long preference does not create a year-long local forecast."
@@ -882,7 +879,7 @@ function PreferencesForm({ initial }: { initial: Preferences }) {
           </select>
         </Field>
       ) : null}
-      {role === "weather" ? (
+      {role === "megha" ? (
         <>
           <Field label="Temperature display">
             <select
@@ -910,7 +907,7 @@ function PreferencesForm({ initial }: { initial: Preferences }) {
           </Field>
         </>
       ) : null}
-      {role === "crop_planning" ? (
+      {role === "kheti" ? (
         <>
           <Field label="Crops of interest (comma separated)">
             <input
@@ -936,7 +933,7 @@ function PreferencesForm({ initial }: { initial: Preferences }) {
           </Field>
         </>
       ) : null}
-      {role === "crop_care" ? (
+      {role === "kheti" ? (
         <>
           <Field
             label="Crop to follow"
@@ -967,7 +964,7 @@ function PreferencesForm({ initial }: { initial: Preferences }) {
           </Field>
         </>
       ) : null}
-      {role === "water" ? (
+      {role === "jal" ? (
         <Field label="Water descriptions">
           <select
             value={draft.water_description ?? "simple"}
@@ -984,7 +981,7 @@ function PreferencesForm({ initial }: { initial: Preferences }) {
           </select>
         </Field>
       ) : null}
-      {role === "market" ? (
+      {role === "paisa" ? (
         <>
           <Field label="Preferred markets (comma separated)">
             <input
@@ -1026,7 +1023,7 @@ function PreferencesForm({ initial }: { initial: Preferences }) {
           </Field>
         </>
       ) : null}
-      {role === "farm_finance" ? (
+      {role === "paisa" ? (
         <Field label="Risk preference">
           <select
             value={draft.risk_preference ?? "lower_risk"}
@@ -1043,7 +1040,7 @@ function PreferencesForm({ initial }: { initial: Preferences }) {
           </select>
         </Field>
       ) : null}
-      {role === "government_support" ? (
+      {role === "paisa" ? (
         <Field label="Areas of assistance (comma separated)">
           <input
             value={draft.assistance_interests.join(", ")}
@@ -1102,7 +1099,7 @@ const tools: Record<
     note: string;
   }[]
 > = {
-  climate: [
+  megha: [
     {
       title: "Seasonal risk scenario",
       kind: "seasonal_risk",
@@ -1114,8 +1111,7 @@ const tools: Record<
       note: "A seasonal signal is not a certain local rainfall prediction.",
     },
   ],
-  weather: [],
-  crop_planning: [
+  kheti: [
     {
       title: "Compare crop options",
       kind: "crop_comparison",
@@ -1151,7 +1147,7 @@ const tools: Record<
       note: "An observation is not a diagnosis. Save actual reports through Update my farm.",
     },
   ],
-  water: [
+  jal: [
     {
       title: "Water availability assessment",
       kind: "water_budget",
@@ -1176,7 +1172,7 @@ const tools: Record<
       note: "This scenario does not record irrigation or water use.",
     },
   ],
-  market: [
+  paisa: [
     {
       title: "Compare dated market options",
       kind: "market_proceeds",
@@ -1489,7 +1485,7 @@ function RolePanels({ role }: { role: Role }) {
   const insights = useRead(
     "getInsights",
     { params: { farmId }, input: {} },
-    Boolean(farmId) && ["climate", "weather", "market"].includes(role.key),
+    Boolean(farmId) && (role.key === "megha" || role.key === "paisa"),
   );
   const tasks = useRead(
     "listTasks",
@@ -1507,8 +1503,10 @@ function RolePanels({ role }: { role: Role }) {
     Boolean(farmId),
   );
   const [selectedFinding, setSelectedFinding] = useState<Finding>();
-  const prefix =
-    role.key === "climate" ? "C" : role.key === "weather" ? "W" : "M";
+  const sourcePrefix = (sourceId: string) =>
+    role.key === "megha"
+      ? sourceId.startsWith("C") || sourceId.startsWith("W")
+      : sourceId.startsWith("M");
   const [update, setUpdate] = useState(false);
   return (
     <>
@@ -1534,23 +1532,19 @@ function RolePanels({ role }: { role: Role }) {
           onClose={() => setSelectedFinding(undefined)}
         />
       ) : null}
-      {["climate", "weather", "market"].includes(role.key) ? (
+      {role.key === "megha" || role.key === "paisa" ? (
         <>
           <h2 style={{ marginBottom: 16 }}>
-            {role.key === "weather"
-              ? "Forecasts and rainfall timelines"
-              : role.key === "market"
-                ? "Dated market price history"
-                : "Climate history and outlook"}
+            {role.key === "paisa"
+              ? "Dated market price history"
+              : "Weather and El Niño timelines"}
           </h2>
           {insights.data?.series
-            .filter((s) => s.source_id.startsWith(prefix))
+            .filter((s) => sourcePrefix(s.source_id))
             .map((s) => (
               <ChartCard key={s.id} series={s} />
             ))}
-          {!insights.data?.series.some((s) =>
-            s.source_id.startsWith(prefix),
-          ) ? (
+          {!insights.data?.series.some((s) => sourcePrefix(s.source_id)) ? (
             <Card>
               <State title="Source information unavailable">
                 A validated source, supported range and applicable geography are
@@ -1563,7 +1557,7 @@ function RolePanels({ role }: { role: Role }) {
           ) : null}
         </>
       ) : null}
-      {role.key === "crop_care" ? (
+      {role.key === "kheti" ? (
         <Card title="Growth-stage tracker and check-in">
           <State title="Your reported stage is the source of truth">
             Sakha does not predict stage dates or crop health from an
@@ -1588,7 +1582,7 @@ function RolePanels({ role }: { role: Role }) {
             </button>
           </div>
           {tasks.data?.items
-            .filter((t) => t.role_key === "crop_care")
+            .filter((t) => t.role_key === "kheti")
             .map((t) => (
               <div className="list-row" key={t.id}>
                 <h3>{t.title}</h3>
@@ -1599,18 +1593,22 @@ function RolePanels({ role }: { role: Role }) {
             ))}
         </Card>
       ) : null}
-      {role.key === "crop_care" ? <CropPhoto role={role} /> : null}
-      {(tools[role.key] ?? []).map((tool) => (
+      {role.key === "kheti" ? <CropPhoto role={role} /> : null}
+      {[
+        ...(tools[role.key] ?? []),
+        ...(role.key === "kheti" ? (tools.crop_care ?? []) : []),
+        ...(role.key === "paisa"
+          ? [...(tools.farm_finance ?? []), ...(tools.government_support ?? [])]
+          : []),
+      ].map((tool) => (
         <ScenarioBuilder key={tool.kind} role={role} tool={tool} />
       ))}
-      {role.key === "water" ||
-      role.key === "farm_finance" ||
-      role.key === "market" ? (
+      {role.key === "jal" || role.key === "paisa" ? (
         <Card
           title={
-            role.key === "water"
+            role.key === "jal"
               ? "Irrigation history"
-              : role.key === "farm_finance"
+              : role.key === "paisa"
                 ? "Reported expenses"
                 : "Recorded sale context"
           }
@@ -1639,7 +1637,7 @@ function RolePanels({ role }: { role: Role }) {
           </div>
         </Card>
       ) : null}
-      {role.key === "government_support" ? (
+      {role.key === "paisa" ? (
         <Card title="Official guidance and insurance">
           <p>
             Check jurisdiction, document date, required papers and official
@@ -1732,7 +1730,7 @@ function RoleHistory({ role }: { role: Role }) {
 export function WorkspacePage() {
   const params = useParams();
   const parsed = RoleKey.safeParse(params.roleKey);
-  const key = parsed.success ? parsed.data : "chief_of_staff";
+  const key = parsed.success ? parsed.data : "sakha";
   const farmId = useFarmId();
   const role = useRead(
     "getAgent",
@@ -1746,7 +1744,7 @@ export function WorkspacePage() {
     { params: { farmId, roleKey: key }, input: {} },
     Boolean(farmId) && tab === "preferences",
   );
-  if (!parsed.success || key === "chief_of_staff")
+  if (!parsed.success || key === "sakha")
     return (
       <State title="Specialist not found">
         Open Ask Sakha for the Chief of Staff.

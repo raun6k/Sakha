@@ -103,7 +103,7 @@ export function Shell() {
                       <NavLink
                         key={role.key}
                         to={
-                          role.key === "chief_of_staff"
+                          role.key === "sakha"
                             ? "/ask"
                             : `/agents/${role.key}?tab=chat`
                         }
@@ -183,9 +183,7 @@ export function Shell() {
               <Link
                 key={role.key}
                 to={
-                  role.key === "chief_of_staff"
-                    ? "/ask"
-                    : `/agents/${role.key}?tab=chat`
+                  role.key === "sakha" ? "/ask" : `/agents/${role.key}?tab=chat`
                 }
                 onClick={() => setMobileAgents(false)}
               >

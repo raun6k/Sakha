@@ -2,7 +2,7 @@ import * as c from "@sakha/contracts";
 import { responseExamples } from "@sakha/contracts/examples";
 import type { RuntimeTurn } from "@sakha/core";
 import { expect, it } from "vitest";
-import { runtimeFailure, StrandsRuntime } from "./index.js";
+import { bedrockReady, runtimeFailure, StrandsRuntime } from "./index.js";
 
 function turn(onText: (text: string) => Promise<void>): RuntimeTurn {
   return {
@@ -23,6 +23,19 @@ function turn(onText: (text: string) => Promise<void>): RuntimeTurn {
       publishFinding: async () => c.Finding.parse(responseExamples.getFinding),
       peer: async () => ({ id: "peer", status: "queued" }),
       clarify: async () => {},
+      searchWeb: async () => [],
+      fetchPage: async () => {
+        throw new Error("unused");
+      },
+      consultSpecialist: async () => ({
+        specialist: "megha",
+        notes: "",
+        citations: [],
+        evidence_ids: [],
+      }),
+      dailyBrief: async () => [],
+      remember: async () => ({ key: "note" }),
+      recordWork: async () => {},
     },
   };
 }
@@ -103,6 +116,37 @@ it("reports missing credentials unavailable and rejects malformed/limited final 
   await expect(runtime.startTurn(turn(async () => {}))).rejects.toThrow(
     "limitTurns",
   );
+});
+it("selects Bedrock from configuration and stays unavailable without a model", async () => {
+  expect(
+    bedrockReady(
+      { provider: "bedrock", model: "anthropic.test", region: "us-east-1" },
+      {},
+    ),
+  ).toBe(false);
+  expect(
+    bedrockReady(
+      {
+        provider: "bedrock",
+        model: "anthropic.test",
+        region: "us-east-1",
+        apiKey: "synthetic",
+      },
+      {},
+    ),
+  ).toBe(true);
+  const missing = new StrandsRuntime({ provider: "bedrock", model: "" });
+  expect((await missing.getCapabilities()).ready).toBe(false);
+  expect((await missing.getCapabilities()).reason).toMatch(/BEDROCK/);
+  const ready = new StrandsRuntime({
+    provider: "bedrock",
+    model: "anthropic.test",
+    region: "us-east-1",
+    apiKey: "synthetic-bedrock-key",
+  });
+  const capabilities = await ready.getCapabilities();
+  expect(capabilities.ready).toBe(true);
+  expect(capabilities.version).toContain("bedrock");
 });
 it("bounds a provider that ignores cancellation", async () => {
   const runtime = new StrandsRuntime(

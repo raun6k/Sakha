@@ -61,14 +61,10 @@ test("J04 each specialist has About Chat Preferences History", async ({
     page.getByRole("heading", { name: "Your farming specialists" }),
   ).toBeVisible();
   for (const path of [
-    "climate",
-    "weather",
-    "crop_planning",
-    "crop_care",
-    "water",
-    "market",
-    "farm_finance",
-    "government_support",
+    "megha",
+    "jal",
+    "kheti",
+    "paisa",
   ]) {
     await page.goto(`/agents/${path}?demo=1`);
     await expect(

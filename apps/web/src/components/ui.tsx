@@ -5,11 +5,8 @@ import {
   CloudSun,
   Droplets,
   Info,
-  Landmark,
   Leaf,
   Sparkles,
-  Sprout,
-  TrendingUp,
   Wallet,
   X,
 } from "lucide-react";
@@ -19,15 +16,11 @@ import { Link } from "react-router";
 import { errorMessage } from "../services/http";
 import { capabilityLabel, chatStatusLabel } from "../services/labels";
 export const roleIcons: Record<RoleKey, typeof Leaf> = {
-  chief_of_staff: Sparkles,
-  climate: TrendingUp,
-  weather: CloudSun,
-  crop_planning: Sprout,
-  crop_care: Leaf,
-  water: Droplets,
-  market: TrendingUp,
-  farm_finance: Wallet,
-  government_support: Landmark,
+  sakha: Sparkles,
+  megha: CloudSun,
+  jal: Droplets,
+  kheti: Leaf,
+  paisa: Wallet,
 };
 export function RoleIcon({ role }: { role: RoleKey }) {
   const Icon = roleIcons[role];
@@ -256,11 +249,7 @@ export function RoleCard({
       <div className="actions">
         <Link
           className="text-link"
-          to={
-            role.key === "chief_of_staff"
-              ? "/ask"
-              : `/agents/${role.key}?tab=chat`
-          }
+          to={role.key === "sakha" ? "/ask" : `/agents/${role.key}?tab=chat`}
         >
           {compact ? "Open chat" : "Chat with specialist"}{" "}
           <ArrowRight size={16} />

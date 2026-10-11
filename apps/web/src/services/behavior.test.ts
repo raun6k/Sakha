@@ -47,7 +47,7 @@ describe("command lifecycle in synthetic adapter", () => {
     const s = createFixtureService();
     const request = {
       params: { farmId: "fixture-farm" },
-      input: { role_key: "water" as const, title: "Question" },
+      input: { role_key: "jal" as const, title: "Question" },
       command,
     };
     const a = await s.execute("createConversation", request);
@@ -347,7 +347,7 @@ describe("historical context and bounded stream state", () => {
             created_at: "2026-10-10T00:00:00Z",
             updated_at: "2026-10-10T00:00:00Z",
             conversation_id: "c",
-            role_key: "chief_of_staff",
+            role_key: "sakha",
             author: "agent",
             status: "final",
             text: "saved",
@@ -370,7 +370,7 @@ describe("historical context and bounded stream state", () => {
       params: { farmId: "fixture-farm" },
       input: {
         farm_id: "fixture-farm",
-        role_key: "water",
+        role_key: "jal",
         kind: "water_budget",
         assumptions: [],
         inputs: { available_water: { kind: "known", value: 120, unit: "m3" } },

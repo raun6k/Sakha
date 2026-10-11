@@ -1,18 +1,45 @@
 import { Entry } from "@napi-rs/keyring";
 import * as c from "@sakha/contracts";
-import type { Runtime, RuntimeCapabilities, RuntimeTurn } from "@sakha/core";
+import {
+  activeSpecialists,
+  charterInstructions,
+  type Runtime,
+  type RuntimeCapabilities,
+  type RuntimeTurn,
+} from "@sakha/core";
 import { DomainError } from "@sakha/farm";
 import { Agent, tool } from "@strands-agents/sdk";
+import { BedrockModel } from "@strands-agents/sdk/models/bedrock";
 import { OpenAIModel } from "@strands-agents/sdk/models/openai";
 import { z } from "zod";
+export type StrandsProvider = "openai" | "bedrock";
 export type StrandsConfiguration = {
+  provider?: StrandsProvider;
   model: string;
   apiKey?: string;
   keyringAccount?: string;
+  region?: string;
   maxTurns?: number;
   maxOutputTokens?: number;
   timeoutMs?: number;
 };
+export function bedrockReady(
+  config: StrandsConfiguration,
+  env: NodeJS.ProcessEnv = process.env,
+) {
+  if ((config.provider ?? "openai") !== "bedrock") return false;
+  if (!config.model.trim()) return false;
+  const region = config.region || env.AWS_REGION || env.AWS_DEFAULT_REGION;
+  if (!region) return false;
+  return Boolean(
+    config.apiKey ||
+      env.AWS_ACCESS_KEY_ID ||
+      env.AWS_PROFILE ||
+      env.AWS_BEARER_TOKEN_BEDROCK ||
+      env.AWS_WEB_IDENTITY_TOKEN_FILE ||
+      env.AWS_CONTAINER_CREDENTIALS_RELATIVE_URI,
+  );
+}
 export interface AgentDriver {
   stream(): AsyncIterable<unknown>;
   cancel(): void;
@@ -39,9 +66,34 @@ export function runtimeFailure(error: unknown): DomainError {
     true,
   );
 }
+async function deniedOrJson(run: () => Promise<unknown>) {
+  try {
+    return JSON.stringify(await run());
+  } catch (error) {
+    if (error instanceof DomainError && error.code === "permission_denied")
+      return JSON.stringify({ decision: "deny", message: error.message });
+    throw error;
+  }
+}
+function createModel(config: StrandsConfiguration, key: string | undefined) {
+  if (config.provider === "bedrock")
+    return new BedrockModel({
+      modelId: config.model,
+      region: config.region,
+      maxTokens: 4096,
+      ...(key ? { apiKey: key } : {}),
+    });
+  return new OpenAIModel({
+    api: "responses",
+    modelId: config.model,
+    apiKey: key ?? "",
+    maxTokens: 4096,
+    stateful: false,
+  });
+}
 function sdkDriver(
   config: StrandsConfiguration,
-  key: string,
+  key: string | undefined,
   turn: RuntimeTurn,
 ): AgentDriver {
   let toolCalls = 0;
@@ -161,17 +213,124 @@ function sdkDriver(
         return "Waiting for farmer clarification";
       },
     }),
-  ];
-  const agent = new Agent({
-    model: new OpenAIModel({
-      api: "responses",
-      modelId: config.model,
-      apiKey: key,
-      maxTokens: 4096,
-      stateful: false,
+    tool({
+      name: "web_search",
+      description:
+        "Search public web sources. Every hit includes a source URL and fetched_at time. Prefer this plus saved evidence.",
+      inputSchema: z.object({ query: z.string().min(1).max(500) }).strict(),
+      callback: async (input) => {
+        check();
+        return deniedOrJson(() => turn.tools.searchWeb(input.query));
+      },
     }),
+    tool({
+      name: "fetch_page",
+      description:
+        "Fetch one public HTTPS page on the agriculture and weather allowlist. Other domains are denied.",
+      inputSchema: z.object({ url: z.url() }).strict(),
+      callback: async (input) => {
+        check();
+        return deniedOrJson(() => turn.tools.fetchPage(input.url));
+      },
+    }),
+    tool({
+      name: "remember",
+      description:
+        "Save one memory key in this teammate's own notes. Profile keys are Sakha's.",
+      inputSchema: z
+        .object({
+          key: z.string().min(1).max(80),
+          value: z.string().min(1).max(500),
+        })
+        .strict(),
+      callback: async (input) => {
+        check();
+        return deniedOrJson(() => turn.tools.remember(input.key, input.value));
+      },
+    }),
+    tool({
+      name: "record_work",
+      description:
+        "Record completed irrigation, spending, sowing or a sale. Sakha cannot do this; the farmer confirms work separately.",
+      inputSchema: z
+        .object({ description: z.string().min(1).max(2000) })
+        .strict(),
+      callback: async (input) => {
+        check();
+        return deniedOrJson(() => turn.tools.recordWork(input.description));
+      },
+    }),
+  ];
+  const model = createModel(config, key);
+  const lead = turn.run.role_key === "sakha";
+  const teammateTools = lead
+    ? activeSpecialists.map((id) => {
+        const teammate = new Agent({
+          model,
+          systemPrompt: charterInstructions(id),
+          tools: tools.filter((item) => {
+            const name = "name" in item ? String(item.name) : "";
+            return ![
+              "propose_plan",
+              "request_specialist",
+              "record_work",
+            ].includes(name);
+          }),
+          printer: false,
+          toolExecutor: "sequential" as const,
+        });
+        return tool({
+          name: `consult_${id}`,
+          description: `Ask ${id} for their lane only. Sakha reviews the Card. Do not invent numbers.`,
+          inputSchema: z
+            .object({ question: z.string().min(1).max(2000) })
+            .strict(),
+          callback: async (input) => {
+            check();
+            const card = await turn.tools.consultSpecialist(id, input.question);
+            if (card.stopped) return JSON.stringify(card);
+            try {
+              const result = await teammate.invoke(input.question);
+              const draft = z
+                .object({
+                  content: z
+                    .array(
+                      z.object({ text: z.string().optional() }).passthrough(),
+                    )
+                    .optional(),
+                })
+                .safeParse(result.lastMessage);
+              const text = draft.success
+                ? (draft.data.content ?? [])
+                    .map((block) => block.text ?? "")
+                    .join("")
+                : "";
+              return JSON.stringify({ ...card, draft: text.slice(0, 2000) });
+            } catch {
+              return JSON.stringify(card);
+            }
+          },
+        });
+      })
+    : [];
+  const daily = lead
+    ? tool({
+        name: "daily_brief",
+        description:
+          "Ask Megha, Jal, Kheti, and Paisa together, then merge one reviewed plan. Use this for the weekly brief.",
+        inputSchema: z
+          .object({ question: z.string().min(1).max(2000) })
+          .strict(),
+        callback: async (input) => {
+          check();
+          return deniedOrJson(() => turn.tools.dailyBrief(input.question));
+        },
+      })
+    : undefined;
+  const agent = new Agent({
+    model,
     systemPrompt: turn.instructions,
-    tools,
+    tools: [...tools, ...teammateTools, ...(daily ? [daily] : [])],
     toolExecutor: "sequential",
     printer: false,
     messages: turn.messages.slice(0, -1).map((message) => ({
@@ -222,9 +381,13 @@ export class StrandsRuntime implements Runtime {
     return undefined;
   }
   async getCapabilities(): Promise<RuntimeCapabilities> {
+    const provider = this.config.provider ?? "openai";
     let ready = false;
     try {
-      ready = Boolean(this.config.model && this.credential());
+      ready =
+        provider === "bedrock"
+          ? bedrockReady(this.config)
+          : Boolean(this.config.model && this.credential());
     } catch {}
     return {
       ready,
@@ -233,18 +396,30 @@ export class StrandsRuntime implements Runtime {
       resume: false,
       approvals: false,
       attachments: false,
-      version: "strands1.20.0-openai6.49.0",
+      version:
+        provider === "bedrock"
+          ? "strands1.20.0-bedrock"
+          : "strands1.20.0-openai6.49.0",
       reason: ready
         ? undefined
-        : "Add an operator model and OpenAI API credential",
+        : provider === "bedrock"
+          ? "Set SAKHA_STRANDS_PROVIDER=bedrock, SAKHA_BEDROCK_MODEL_ID, AWS_REGION, and AWS credentials or SAKHA_BEDROCK_API_KEY"
+          : "Add an operator model and OpenAI API credential",
     };
   }
   async startTurn(turn: RuntimeTurn) {
-    const key = this.credential();
-    if (!key || !this.config.model)
+    const provider = this.config.provider ?? "openai";
+    const key = provider === "bedrock" ? this.config.apiKey : this.credential();
+    if (
+      provider === "bedrock"
+        ? !bedrockReady(this.config)
+        : !key || !this.config.model
+    )
       throw new DomainError(
         "unavailable",
-        "Configure OPENAI_API_KEY and SAKHA_OPENAI_MODEL, or OS keyring reference",
+        provider === "bedrock"
+          ? "Configure SAKHA_BEDROCK_MODEL_ID, AWS_REGION, and AWS credentials or SAKHA_BEDROCK_API_KEY"
+          : "Configure OPENAI_API_KEY and SAKHA_OPENAI_MODEL, or OS keyring reference",
       );
     const timeoutController = new AbortController();
     const signal = AbortSignal.any([turn.signal, timeoutController.signal]);

@@ -8,17 +8,7 @@ const PublicSourceUrl = z
   );
 export const Id = z.string().min(1).max(128);
 export const Timestamp = z.iso.datetime({ offset: true });
-export const RoleKey = z.enum([
-  "chief_of_staff",
-  "climate",
-  "weather",
-  "crop_planning",
-  "crop_care",
-  "water",
-  "market",
-  "farm_finance",
-  "government_support",
-]);
+export const RoleKey = z.enum(["sakha", "megha", "jal", "kheti", "paisa"]);
 export type RoleKey = z.infer<typeof RoleKey>;
 export const roles = RoleKey.options;
 export const Scope = z.object({ farm_id: Id, field_id: Id.optional() });
@@ -187,7 +177,40 @@ export const Role = z.object({
   limitations: z.array(z.string()),
   source_ids: z.array(Id),
   capabilities: z.array(Capability),
+  /** One-line job the farmer sees on the team list. */
+  role_line: z.string().optional(),
+  /** Short status. Live numbers stay out until a source provides them. */
+  status_line: z.string().optional(),
+  /** Palette key, such as #1F6F43. */
+  color: z.string().optional(),
+  /** Avatar key: sakha, megha, jal, kheti, paisa. */
+  avatar: z.string().optional(),
 });
+export const CardSource = z.object({
+  title: z.string().min(1),
+  url: z.string().optional(),
+  adapter: z.string().optional(),
+  fetched_at: Timestamp,
+});
+export const TeamCard = z.object({
+  agent: RoleKey,
+  headline: z.string().min(1).max(200),
+  do: z.array(z.string().min(1)).min(1).max(3),
+  why: z.string().min(1),
+  cost_inr: z.number().finite().optional(),
+  benefit_inr: z.number().finite().optional(),
+  risk: z.enum(["low", "medium", "high"]),
+  confidence: z.enum(["low", "medium", "high"]),
+  sources: z.array(CardSource).min(1),
+  handoff_suggestion: z
+    .object({ to: RoleKey, reason: z.string().min(1) })
+    .optional(),
+  out_of_scope: z.boolean().optional(),
+  consulted: z.array(RoleKey).optional(),
+  reviewed: z.boolean().optional(),
+  reviewed_by: z.literal("sakha").optional(),
+});
+export type TeamCard = z.infer<typeof TeamCard>;
 export const RunState = z.enum([
   "queued",
   "running",
@@ -198,6 +221,15 @@ export const RunState = z.enum([
   "cancelled",
   "interrupted",
 ]);
+/** A public page Sakha retrieved. `source` is the provider or the publisher host. */
+export const WebCitation = z.object({
+  url: PublicSourceUrl,
+  title: z.string().min(1),
+  snippet: z.string().min(1),
+  source: z.string().min(1),
+  fetched_at: Timestamp,
+});
+export type WebCitation = z.infer<typeof WebCitation>;
 export const Message = RecordBase.extend({
   conversation_id: Id,
   role_key: RoleKey,
@@ -208,6 +240,13 @@ export const Message = RecordBase.extend({
     fact_versions: z.record(Id, z.number().int()),
     evidence: z.array(EvidenceRef),
     field_id: Id.optional(),
+    /** Present when a turn searched or fetched. Older transcripts omit it. */
+    citations: z.array(WebCitation).optional(),
+    /** Teammates whose Cards were used. Farmer-facing copy uses their names. */
+    consulted: z.array(RoleKey).optional(),
+    /** Sakha checked this answer before the farmer saw it. */
+    reviewed_by: z.literal("sakha").optional(),
+    card: TeamCard.optional(),
   }),
 });
 export const Conversation = RecordBase.extend({

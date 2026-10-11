@@ -849,7 +849,7 @@ export function ActivityPage() {
                   ) : h.kind === "finding" ? (
                     <Link
                       className="text-link"
-                      to={`/agents/${h.role_key ?? "climate"}?tab=history`}
+                      to={`/agents/${h.role_key ?? "megha"}?tab=history`}
                     >
                       Specialist history
                     </Link>

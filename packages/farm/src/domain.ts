@@ -554,10 +554,10 @@ export function createDomainServices(
               if (task.field_id)
                 load(store, "field", task.field_id, farmId, c.Field);
               if (
-                task.role_key === "water" &&
+                task.role_key === "jal" &&
                 !supporting.some(
                   (finding) =>
-                    finding.role_key === "water" &&
+                    finding.role_key === "jal" &&
                     finding.constraints.some(
                       (constraint) =>
                         constraint.critical &&
@@ -771,7 +771,7 @@ export function createDomainServices(
                   "scope_denied",
                   "Work field differs from task field",
                 );
-              if (task.role_key === "water" && d.kind !== "irrigation")
+              if (task.role_key === "jal" && d.kind !== "irrigation")
                 throw new DomainError(
                   "validation",
                   "Water task requires irrigation work confirmation",

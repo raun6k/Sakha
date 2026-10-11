@@ -69,27 +69,27 @@ const fact = c.Fact.parse({
 const field = c.Field.parse({ ...base, name: "Example field", area: quantity });
 const preferences = c.Preferences.parse({
   version: 1,
-  role_key: "water",
+  role_key: "jal",
   explanation: "inherit",
 });
 const consent = c.Consent.parse({
   ...base,
   purpose: "financial planning",
   fields: ["budget"],
-  roles: ["farm_finance"],
+  roles: ["paisa"],
   external_processing: false,
   status: "active",
   storage: "persistent",
 });
 const conversation = c.Conversation.parse({
   ...base,
-  role_key: "water",
+  role_key: "jal",
   title: "Synthetic conversation",
 });
 const message = c.Message.parse({
   ...base,
   conversation_id: base.id,
-  role_key: "water",
+  role_key: "jal",
   author: "agent",
   text: "Synthetic example: please report the available water.",
   status: "final",
@@ -98,7 +98,7 @@ const message = c.Message.parse({
 const run = c.Run.parse({
   ...base,
   conversation_id: base.id,
-  role_key: "water",
+  role_key: "jal",
   state: "interrupted",
   pending: [],
   capabilities: [],
@@ -106,7 +106,7 @@ const run = c.Run.parse({
 });
 const finding = c.Finding.parse({
   ...base,
-  role_key: "water",
+  role_key: "jal",
   title: "Water measurement needed",
   summary: "No water feasibility claim can be made.",
   evidence: [],
@@ -118,7 +118,7 @@ const finding = c.Finding.parse({
 });
 const scenarioRequest = c.ScenarioRequest.parse({
   farm_id: base.farm_id,
-  role_key: "water",
+  role_key: "jal",
   kind: "water_budget",
   inputs: { water: quantity },
   assumptions: [],
@@ -138,7 +138,7 @@ const task = c.Task.parse({
   ...base,
   title: "Report available water",
   description: "Measure or report qualitative availability.",
-  role_key: "water",
+  role_key: "jal",
   status: "pending",
   evidence: [],
 });
@@ -173,7 +173,7 @@ const alert = c.Alert.parse({
   title: "Example information alert",
   summary: "No weather warning is asserted.",
   severity: "information",
-  role_key: "weather",
+  role_key: "megha",
   status: "acknowledged",
   evidence: [],
   issued_at: fixtureTime,
@@ -302,7 +302,7 @@ export const responseExamples: Record<c.OperationName, unknown> = {
   grantConsent: consent,
   revokeConsent: { ...consent, status: "revoked" },
   listAgents: fixtureRoles,
-  getAgent: fixtureRoles[5],
+  getAgent: fixtureRoles[2],
   listConversations: paged(conversation),
   createConversation: conversation,
   getConversation: conversation,

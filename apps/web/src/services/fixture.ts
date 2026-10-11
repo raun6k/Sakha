@@ -17,103 +17,52 @@ const roleCopy: Record<
     sources: string[];
   }
 > = {
-  chief_of_staff: {
-    name: "Chief of Staff",
+  sakha: {
+    name: "Sakha",
     label: "Ask Sakha",
-    description: "Bring your farm questions, options and decisions together.",
+    description: "Your farm team lead. One reviewed plan from the teammates.",
     questions: [
       "What should I focus on this week?",
       "Help me review my farming plan.",
     ],
     sources: [],
   },
-  climate: {
-    name: "El Niño & Climate",
-    label: "Understand El Niño",
-    description:
-      "Understand seasonal signals, uncertainty and climate scenarios.",
+  megha: {
+    name: "Megha",
+    label: "Weather and El Niño",
+    description: "Forecasts, monsoon, and El Niño, each with a source.",
     questions: [
-      "What can El Niño tell me about this season?",
-      "Compare rainfall history with this season.",
+      "Will it rain this week?",
+      "What does El Niño mean for this season?",
     ],
-    sources: ["C01", "W03"],
+    sources: ["C01", "W01", "W03", "W04"],
   },
-  weather: {
-    name: "Weather & Alerts",
-    label: "Check Weather",
-    description:
-      "Explore local forecasts, official warnings and weather-sensitive work.",
+  jal: {
+    name: "Jal",
+    label: "Water",
+    description: "When to irrigate, using a dated rain source.",
     questions: [
-      "What weather information is available?",
-      "Is the forecast useful for my next field activity?",
-    ],
-    sources: ["W01", "W03", "W04"],
-  },
-  crop_planning: {
-    name: "Crop Planning",
-    label: "Plan My Crops",
-    description:
-      "Compare crop options, sowing windows and water or budget constraints.",
-    questions: [
-      "What information do you need to compare crops?",
-      "Help me create a planting scenario.",
-    ],
-    sources: ["A01"],
-  },
-  crop_care: {
-    name: "Crop Care",
-    label: "Care for My Crops",
-    description:
-      "Keep crop observations and stage context together for care decisions.",
-    questions: [
-      "What should I record about my crop?",
-      "How do I describe the symptoms I am seeing?",
-    ],
-    sources: ["A01"],
-  },
-  water: {
-    name: "Water & Irrigation",
-    label: "Manage Water",
-    description:
-      "Review available water, irrigation history and conservation choices.",
-    questions: [
+      "Should I irrigate or wait?",
       "What water measurements do I need?",
-      "Review my irrigation history.",
     ],
     sources: ["W03", "W04"],
   },
-  market: {
-    name: "Market & Sales",
-    label: "Sell My Harvest",
-    description:
-      "Compare dated prices and sale or storage scenarios with known costs.",
+  kheti: {
+    name: "Kheti",
+    label: "Crops and soil",
+    description: "Sowing, stage, pests, and contingency crops.",
     questions: [
-      "What information do you need to estimate proceeds?",
-      "Compare sale and storage options.",
+      "What should I record about my crop?",
+      "What can I sow this season?",
     ],
-    sources: ["M01"],
+    sources: ["A01"],
   },
-  farm_finance: {
-    name: "Farm Finance",
-    label: "Manage Farm Money",
-    description:
-      "Review reported expenses, budgets and affordability scenarios.",
-    questions: [
-      "Help me compare crop budgets.",
-      "What costs are missing from my scenario?",
-    ],
-    sources: [],
-  },
-  government_support: {
-    name: "Government Support",
-    label: "Find Government Help",
-    description:
-      "Explore official programmes, document checklists and insurance guidance.",
-    questions: [
-      "What documents should I check?",
-      "Help me understand a programme.",
-    ],
-    sources: ["G01"],
+  paisa: {
+    name: "Paisa",
+    label: "Money and mandi",
+    description: "Mandi prices, costs, and public schemes from dated sources.",
+    questions: ["Should I sell now?", "Which scheme page should I read?"],
+    sources: ["M01", "G01"],
   },
 };
 export function createFixtureService(
@@ -216,7 +165,7 @@ export function createFixtureService(
       title: "Inspect and record crop condition",
       description:
         "A synthetic planning task, not an agronomic recommendation.",
-      role_key: "crop_care",
+      role_key: "kheti",
       status: "proposed",
       evidence: [],
     }),
@@ -245,7 +194,7 @@ export function createFixtureService(
       summary:
         "Synthetic reminder: record what you can see. No weather warning is asserted.",
       severity: "information",
-      role_key: "crop_care",
+      role_key: "kheti",
       status: "active",
       evidence: [],
       issued_at: fixtureTime,

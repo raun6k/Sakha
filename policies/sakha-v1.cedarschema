@@ -1,14 +1,22 @@
 namespace Sakha {
  entity Farmer {farm: String};
- entity Agent {farm: String};
- entity Resource {farm: String, private: Bool};
-action "read" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool}};
-action "write" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool}};
-action "memory" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool}};
-action "propose" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool}};
-action "peer" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool}};
-action "clarify" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool}};
-action "record_work" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool}};
-action "decide_plan" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool}};
-action "save_fact" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool}};
+ entity Agent {farm: String, role: String};
+ entity Resource {farm: String, private: Bool, namespace: String};
+action "read" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "write" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "memory" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "propose" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "peer" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "clarify" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "record_work" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "decide_plan" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "save_fact" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "web_search" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "fetch_page" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "consult" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "market" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "write_profile" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "payment" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "submit_form" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "send_message" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
 }

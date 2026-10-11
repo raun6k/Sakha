@@ -1,6 +1,6 @@
 # Sakha
 
-Sakha is a local farming Command Center with one loopback backend, a browser interface and nine persistent farm-scoped specialist roles. Farmer facts, evidence, conversations, scenarios, plans and confirmed work have separate records. Approving a plan never records irrigation, spending, sowing or a sale.
+Sakha is a local farming Command Center with one loopback backend and a visible farm team: Sakha leads Megha (weather), Jal (water), Kheti (crops), and Paisa (money). Farmer facts, evidence, conversations, scenarios, plans and confirmed work have separate records. Approving a plan never records irrigation, spending, sowing or a sale.
 
 ## Run locally
 
@@ -24,7 +24,11 @@ There is no farmer account or password. Bootstrap creates a process-local sessio
 
 ## Runtime and public evidence
 
-Copy `.env.example` to `.env` and fill the selected runtime configuration. Release startup, development backend and operator commands load this ignored file; exported environment variables take precedence. Keep the file private. Choose either the installed Codex runtime with `SAKHA_CODEX_ENABLED=true`, or the Strands/OpenAI runtime with `OPENAI_API_KEY` and `SAKHA_OPENAI_MODEL`. An optional `SAKHA_OPENAI_KEYRING_ACCOUNT` reads an existing OS-keyring credential. All Sakha roles use GPT-6 Luna (`gpt-6-luna`) by default through the shared Codex runtime, with no automatic model fallback. The Codex path uses your existing Codex login and subscription allowance; it does not require an OpenAI API key. API credentials are needed only if you choose the alternative Strands/OpenAI runtime. Sakha never copies Codex tokens into API-key storage. All external runtime turns, including Codex, require explicit role/field grants for external processing, including conversation text.
+Copy `.env.example` to `.env` and fill the selected runtime configuration. Release startup, development backend and operator commands load this ignored file; exported environment variables take precedence. Keep the file private. Choose either the installed Codex runtime with `SAKHA_CODEX_ENABLED=true`, or the Strands runtime. Strands defaults to OpenAI (`OPENAI_API_KEY` and `SAKHA_OPENAI_MODEL`). Set `SAKHA_STRANDS_PROVIDER=bedrock` with `SAKHA_BEDROCK_MODEL_ID`, `AWS_REGION`, and AWS credentials or `SAKHA_BEDROCK_API_KEY` to use Amazon Bedrock instead. An optional `SAKHA_OPENAI_KEYRING_ACCOUNT` reads an existing OS-keyring credential. Codex still defaults to GPT-6 Luna (`gpt-6-luna`) with no automatic model fallback. The Codex path uses your existing Codex login and subscription allowance; it does not require an OpenAI API key. `SAKHA_CODEX_WEB_SEARCH` stays `disabled` unless set to `cached` or `live`. Public web search tries Tavily (`TAVILY_API_KEY`), then Exa (`EXA_API_KEY`, or a no-key attempt unless `SAKHA_EXA_FREE_TIER=0`), then DuckDuckGo, then a small cached snippet list. Every hit keeps a source URL and `fetched_at`. One active external-processing grant that includes conversation text unlocks chat for the whole team. Sakha never copies Codex tokens into API-key storage.
+
+## Agent eval
+
+`pnpm eval:agents` runs the farmer prompt suite with no model call. It checks routing (including Hindi, the daily brief, and the charter stress prompts), the three-call and two-hop caps, Cedar's Paisa market permit and Megha market denial, and cached-source labels. `pnpm eval:agents -- --live` runs those same checks and then asks whether Strands is configured. Without a key it exits 2 and prints the variables to set. A live key can complete a real model turn in the app; this command does not spend one. Answer quality, nested specialist wording, and live Tavily, Exa, or DuckDuckGo HTTP still need that key.
 
 The Codex adapter uses the pinned installed app-server protocol, an ephemeral read-only workspace, no native shell/browser tools or general network access, and eight scoped Sakha MCP tools. Native continuation, approval escalation and image analysis are unavailable. Uploaded JPEG/PNG/WebP photos remain local; upload does not imply analysis.
 

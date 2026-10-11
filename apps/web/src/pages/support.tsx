@@ -366,17 +366,7 @@ function ConsentPanel() {
                 ...(financial ? ["F05"] : []),
                 ...(support ? ["F08"] : []),
               ],
-              roles: [
-                "chief_of_staff",
-                "climate",
-                "weather",
-                "crop_planning",
-                "crop_care",
-                "water",
-                "market",
-                "farm_finance",
-                "government_support",
-              ],
+              roles: ["sakha", "megha", "jal", "kheti", "paisa"],
               external_processing: external,
               storage: "persistent",
             })
@@ -662,7 +652,7 @@ const help = [
   ],
   [
     "Understanding the agents",
-    "Ask Sakha coordinates your shared plan. Eight specialists cover climate, weather, crop planning, crop care, water, markets, finance and government support. They can consult one another without changing your page.",
+    "Sakha leads Megha, Jal, Kheti, and Paisa. Sakha checks every answer. Teammates do not message each other.",
   ],
   [
     "Forecast and evidence limitations",
@@ -705,7 +695,7 @@ export function HelpPage() {
               </details>
             ))}
           </Card>
-          <Card title="All nine roles">
+          <Card title="The farm team">
             {roles.data?.map((role) => (
               <div className="list-row" key={role.key}>
                 <div>
@@ -715,7 +705,7 @@ export function HelpPage() {
                 <Link
                   className="text-link"
                   to={
-                    role.key === "chief_of_staff"
+                    role.key === "sakha"
                       ? "/ask"
                       : `/agents/${role.key}?tab=about`
                   }

@@ -3,7 +3,12 @@ import * as c from "@sakha/contracts";
 import { responseExamples } from "@sakha/contracts/examples";
 import type { RuntimeTurn } from "@sakha/core";
 import { expect, it, vi } from "vitest";
-import { CodexRuntime, invokeScopedTool } from "./index.js";
+import {
+  CodexRuntime,
+  codexNetworkClause,
+  codexWebSearchMode,
+  invokeScopedTool,
+} from "./index.js";
 
 function turn(onText: (text: string) => Promise<void>): RuntimeTurn {
   return {
@@ -24,6 +29,19 @@ function turn(onText: (text: string) => Promise<void>): RuntimeTurn {
       publishFinding: async () => c.Finding.parse(responseExamples.getFinding),
       peer: async () => ({ id: "peer", status: "queued" }),
       clarify: async () => {},
+      searchWeb: async () => [],
+      fetchPage: async () => {
+        throw new Error("unused");
+      },
+      consultSpecialist: async () => ({
+        specialist: "megha",
+        notes: "",
+        citations: [],
+        evidence_ids: [],
+      }),
+      dailyBrief: async () => [],
+      remember: async () => ({ key: "note" }),
+      recordWork: async () => {},
     },
   };
 }
@@ -71,6 +89,27 @@ it("rejects persistence failures rather than publishing canonical success", asyn
       }),
     ),
   ).rejects.toThrow("Codex protocol turn failed");
+});
+it("keeps Codex web search off unless the operator chooses cached or live", () => {
+  expect(codexWebSearchMode(undefined)).toBe("disabled");
+  expect(codexWebSearchMode("yes")).toBe("disabled");
+  expect(codexWebSearchMode("cached")).toBe("cached");
+  expect(codexWebSearchMode("live")).toBe("live");
+  expect(codexNetworkClause("disabled")).toBe("network={enabled=false}");
+  expect(codexNetworkClause("cached")).toBe("network={enabled=false}");
+  expect(codexNetworkClause("live")).toBe("network={enabled=true}");
+});
+it("routes web search and page fetch through the scoped gateway", async () => {
+  const input = turn(async () => {});
+  const search = vi.spyOn(input.tools, "searchWeb").mockResolvedValue([]);
+  await invokeScopedTool(input, "web_search", { query: "El Niño Vidarbha" });
+  expect(search).toHaveBeenCalledWith("El Niño Vidarbha");
+  await expect(
+    invokeScopedTool(input, "fetch_page", { url: "not a url" }),
+  ).rejects.toThrow();
+  await expect(
+    invokeScopedTool(input, "web_search", { query: "" }),
+  ).rejects.toThrow();
 });
 it("rejects forged identity and unknown tools before side effects", async () => {
   const input = turn(async () => {});

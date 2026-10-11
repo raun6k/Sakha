@@ -105,6 +105,7 @@ export class JsonRpcConnection {
     this.child.kill();
   }
 }
+export type CodexWebSearch = "disabled" | "cached" | "live";
 export type CodexConfiguration = {
   enabled: boolean;
   binary?: string;
@@ -112,11 +113,21 @@ export type CodexConfiguration = {
   bridgeEntrypoint: string;
   loaderPath?: string;
   timeoutMs?: number;
+  webSearch?: CodexWebSearch;
   spawnProcess?: (
     args: string[],
     cwd: string,
   ) => ChildProcessWithoutNullStreams;
 };
+export function codexWebSearchMode(value: string | undefined): CodexWebSearch {
+  if (value === "cached" || value === "live") return value;
+  return "disabled";
+}
+export function codexNetworkClause(webSearch: CodexWebSearch = "disabled") {
+  return webSearch === "live"
+    ? "network={enabled=true}"
+    : "network={enabled=false}";
+}
 export const gatewaySchemas = {
   read_farm_facts: z.object({}).strict(),
   recall_memory: z.object({ query: z.string().min(1).max(1000) }).strict(),
@@ -150,6 +161,22 @@ export const gatewaySchemas = {
   ask_clarification: z
     .object({ question: z.string().min(1).max(2000) })
     .strict(),
+  web_search: z.object({ query: z.string().min(1).max(500) }).strict(),
+  fetch_page: z.object({ url: z.url() }).strict(),
+  consult_specialist: z
+    .object({
+      specialist: z.string().min(1).max(64),
+      question: z.string().min(1).max(2000),
+    })
+    .strict(),
+  daily_brief: z.object({ question: z.string().min(1).max(2000) }).strict(),
+  remember: z
+    .object({
+      key: z.string().min(1).max(80),
+      value: z.string().min(1).max(500),
+    })
+    .strict(),
+  record_work: z.object({ description: z.string().min(1).max(2000) }).strict(),
 };
 export async function invokeScopedTool(
   turn: RuntimeTurn,
@@ -185,6 +212,27 @@ export async function invokeScopedTool(
       await turn.tools.clarify(input.question);
       return { status: "waiting_clarification" };
     }
+    case "web_search":
+      return turn.tools.searchWeb(gatewaySchemas.web_search.parse(args).query);
+    case "fetch_page":
+      return turn.tools.fetchPage(gatewaySchemas.fetch_page.parse(args).url);
+    case "consult_specialist": {
+      const input = gatewaySchemas.consult_specialist.parse(args);
+      return turn.tools.consultSpecialist(input.specialist, input.question);
+    }
+    case "daily_brief":
+      return turn.tools.dailyBrief(
+        gatewaySchemas.daily_brief.parse(args).question,
+      );
+    case "remember": {
+      const input = gatewaySchemas.remember.parse(args);
+      return turn.tools.remember(input.key, input.value);
+    }
+    case "record_work":
+      await turn.tools.recordWork(
+        gatewaySchemas.record_work.parse(args).description,
+      );
+      return { decision: "deny" };
     default:
       throw new DomainError("permission_denied", "Unknown scoped tool");
   }
@@ -306,7 +354,9 @@ export class CodexRuntime implements Runtime {
       : ["--conditions=sakha-release", this.configuration.bridgeEntrypoint];
     const binary = realpathSync(
       this.configuration.binary ??
-        execFileSync("which", ["codex"], { encoding: "utf8" }).trim(),
+        (this.configuration.spawnProcess
+          ? process.execPath
+          : execFileSync("which", ["codex"], { encoding: "utf8" }).trim()),
     );
     const filePermissions: Record<string, unknown> = {
       ":root": "deny",
@@ -329,7 +379,7 @@ export class CodexRuntime implements Runtime {
         ([key, value]) =>
           `${JSON.stringify(key)}=${typeof value === "string" ? JSON.stringify(value) : '{"."="read"}'}`,
       )
-      .join(",")}},network={enabled=false}}`;
+      .join(",")}},${codexNetworkClause(this.configuration.webSearch)}}`;
     const args = [
       "app-server",
       "--listen",
@@ -417,9 +467,9 @@ export class CodexRuntime implements Runtime {
           model: this.configuration.model,
           baseInstructions: turn.instructions,
           developerInstructions:
-            "Native shell, file, browser and network tools are disabled. Use only the run-bound Sakha MCP tools. Never read outside the runtime workspace.",
+            "Native shell, file and browser tools are disabled. Use Sakha web_search and fetch_page for public sources; fetch_page only succeeds for allowlisted agriculture and weather domains. record_work is denied. Never read outside the runtime workspace.",
           config: {
-            web_search: "disabled",
+            web_search: this.configuration.webSearch ?? "disabled",
             mcp_servers: {
               ...disabledServers,
               sakha: {

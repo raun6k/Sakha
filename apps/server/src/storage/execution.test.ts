@@ -22,7 +22,7 @@ function setup(runtime?: Runtime) {
   const conversation = c.Conversation.parse(
     services.core.execute(
       "createConversation",
-      { role_key: "chief_of_staff", title: "Test" },
+      { role_key: "sakha", title: "Test" },
       { farmId: farm.id },
     ),
   );
@@ -42,7 +42,7 @@ function grant(s: ReturnType<typeof setup>) {
       ...s.farm.makeBase(s.farmId),
       category: "external_processing",
       fields: ["conversation"],
-      roles: ["chief_of_staff"],
+      roles: ["sakha"],
       external_processing: true,
       storage: "persistent",
       status: "active",
@@ -182,7 +182,7 @@ it("bounds busy-peer retries before delivery and records failed inbox outcome", 
   const conversation = c.Conversation.parse(
     s.core.execute(
       "createConversation",
-      { role_key: "weather", title: "Busy recipient" },
+      { role_key: "megha", title: "Busy recipient" },
       { farmId: s.farmId },
     ),
   );
@@ -195,7 +195,7 @@ it("bounds busy-peer retries before delivery and records failed inbox outcome", 
   s.core.saveRun({ ...s.run, state: "running" });
   const peer = await s.execution
     .tools(s.run)
-    .peer("weather", "Synthetic bounded request");
+    .peer("megha", "Synthetic bounded request");
   for (let attempt = 0; attempt < 3; attempt++) {
     s.store.db
       .prepare("UPDATE outbox SET available_at='1970-01-01T00:00:00Z'")
