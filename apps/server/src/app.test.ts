@@ -72,3 +72,44 @@ it("rejects foreign host, cross-origin bootstrap and absent session; token rotat
   expect(restarted.sessionToken).not.toBe(sessionToken);
   await restarted.app.close();
 });
+it("returns valid Home and specialist capabilities before external consent is granted", async () => {
+  const s = createApp({
+    databasePath: ":memory:",
+    origin: "http://localhost:80",
+    runtime: {
+      getCapabilities: async () => ({
+        ready: true,
+        text: true,
+        cancel: true,
+        resume: false,
+        approvals: false,
+        attachments: false,
+        version: "test-double",
+      }),
+      startTurn: async () => ({ text: "unused" }),
+    },
+  });
+  const response = await s.app.inject({
+    method: "POST",
+    url: "/api/v1/farms",
+    headers: {
+      "idempotency-key": "home-profile",
+      "x-sakha-session": s.sessionToken,
+    },
+    payload: { name: "Synthetic Home test" },
+  });
+  const id = response.json().data.id;
+  const home = await s.app.inject({
+    url: `/api/v1/farms/${id}/home`,
+    headers: { "x-sakha-session": s.sessionToken },
+  });
+  expect(home.statusCode).toBe(200);
+  expect(
+    home
+      .json()
+      .data.sections.agents[0].capabilities.find(
+        (x: { key: string }) => x.key === "chat",
+      ).status,
+  ).toBe("disabled");
+  await s.app.close();
+});

@@ -744,8 +744,13 @@ export function ConversationView({ role }: { role: Role }) {
   );
 }
 export function AskPage() {
-  const q = useRead("listAgents", { input: {} });
-  const role = q.data?.find((r) => r.key === "chief_of_staff");
+  const farmId = useFarmId();
+  const q = useRead(
+    "getAgent",
+    { params: { farmId, roleKey: "chief_of_staff" }, input: {} },
+    Boolean(farmId),
+  );
+  const role = q.data;
   return (
     <div className="route-content">
       <PageHeading
@@ -1024,7 +1029,10 @@ function PreferencesForm({ initial }: { initial: Preferences }) {
           onClick={() =>
             void mutation
               .mutateAsync(draft)
-              .then(() => setSaved(true))
+              .then((updated) => {
+                setDraft(updated);
+                setSaved(true);
+              })
               .catch(() => {})
           }
         >
@@ -1775,10 +1783,7 @@ export function WorkspacePage() {
             </>
           ) : tab === "preferences" ? (
             preferences.data ? (
-              <PreferencesForm
-                key={`${key}-${preferences.data.version}`}
-                initial={preferences.data}
-              />
+              <PreferencesForm key={key} initial={preferences.data} />
             ) : (
               <Loading />
             )

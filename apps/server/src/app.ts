@@ -169,13 +169,24 @@ export function createApp(options: {
                   cap.key === "chat" && runtimeReady && !consent
                     ? {
                         ...cap,
-                        status: "needs_information" as const,
+                        status: "disabled" as const,
                         reason:
                           "Grant external processing of conversation text to this specialist",
                         requirements: ["scoped external-processing consent"],
                       }
                     : cap,
                 ),
+                ...(role.key === "crop_care"
+                  ? [
+                      {
+                        key: "photo_upload",
+                        status: "enabled" as const,
+                        reason:
+                          "Private local JPEG, PNG and WebP storage; no image analysis or external processing",
+                        requirements: [],
+                      },
+                    ]
+                  : []),
                 ...(role.key === "market"
                   ? [
                       {
@@ -394,6 +405,11 @@ export function createApp(options: {
         .send(lifecycle.download(farmId, jobId));
     },
   );
+  const openStreams = new Set<() => void>();
+  app.addHook("preClose", async () => {
+    for (const close of openStreams) close();
+    openStreams.clear();
+  });
   app.register(sse, { heartbeatInterval: 15000 });
   app.register(async (server) => {
     server.get(
@@ -419,6 +435,8 @@ export function createApp(options: {
         };
         await send();
         stream.keepAlive();
+        const close = () => stream.close();
+        openStreams.add(close);
         let pending = false;
         const interval = setInterval(() => {
           if (pending) return;
@@ -429,7 +447,10 @@ export function createApp(options: {
               pending = false;
             });
         }, 250);
-        stream.onClose(() => clearInterval(interval));
+        stream.onClose(() => {
+          clearInterval(interval);
+          openStreams.delete(close);
+        });
       },
     );
   });

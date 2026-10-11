@@ -1,16 +1,25 @@
 import { createHash } from "node:crypto";
 import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { importMarketQuote, refreshCoreEvidence } from "@sakha/data";
 import envPaths from "env-paths";
 import { createApp } from "./app.js";
+import { lockDatabase } from "./process-lock.js";
 
 const paths = envPaths("sakha", { suffix: "" });
-const { app, store, farm, dataServices } = createApp({
-  databasePath:
-    (process.env.SAKHA_DATABASE_PATH?.trim() || undefined) ??
-    join(paths.data, "sakha.sqlite"),
-});
+const databasePath =
+  (process.env.SAKHA_DATABASE_PATH?.trim() || undefined) ??
+  join(paths.data, "sakha.sqlite");
+mkdirSync(dirname(databasePath), { recursive: true, mode: 0o700 });
+const unlock = lockDatabase(databasePath);
+let services: ReturnType<typeof createApp>;
+try {
+  services = createApp({ databasePath });
+} catch (error) {
+  unlock();
+  throw error;
+}
+const { app, store, farm, dataServices } = services;
 const [command, farmId, arg, extra] = process.argv.slice(2);
 try {
   if (command === "farms") {
@@ -91,5 +100,9 @@ try {
       "Usage: pnpm operator farms | refresh FARM_ID [HISTORICAL_DAYS=30] [FORECAST_DAYS=7] | import FARM_ID CURATED_JSON RAW_PDF | market-import FARM_ID QUOTE_JSON RAW_SOURCE",
     );
 } finally {
-  await app.close();
+  try {
+    await app.close();
+  } finally {
+    unlock();
+  }
 }

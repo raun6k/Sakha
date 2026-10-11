@@ -15,8 +15,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build": "pnpm --filter @sakha/web build && tsc -p apps/server/tsconfig.build.json && tsx apps/server/src/build-assets.ts",
-    "start": "node --conditions=sakha-release apps/server/dist/apps/server/src/index.js",
-    "operator": "tsx apps/server/src/cli.ts"
+    "start": "node --env-file-if-exists=.env --conditions=sakha-release apps/server/dist/apps/server/src/index.js",
+    "operator": "node --env-file-if-exists=.env --import tsx apps/server/src/cli.ts",
+    "test:browser": "playwright test -c apps/web/integration.playwright.config.ts",
+    "test:demo": "playwright test -c apps/web/playwright.config.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

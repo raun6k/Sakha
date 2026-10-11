@@ -52,7 +52,8 @@ it("serves authenticated SSE over real HTTP and replays a retained farm cursor",
     const reader = response.body?.getReader();
     const chunk = await reader?.read();
     expect(new TextDecoder().decode(chunk?.value)).toContain("finding_ready");
-    abort.abort();
+    // Shutdown must finish even while the browser still holds an SSE connection.
+    await s.app.close();
   } finally {
     abort.abort();
     await s.app.close();
