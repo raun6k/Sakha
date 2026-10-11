@@ -1,5 +1,11 @@
 import { z } from "zod";
 export const CONTRACT_VERSION = "sakha.v1" as const;
+const PublicSourceUrl = z
+  .url()
+  .refine(
+    (value) => /^https?:\/\//i.test(value),
+    "Public sources require an HTTP or HTTPS URL",
+  );
 export const Id = z.string().min(1).max(128);
 export const Timestamp = z.iso.datetime({ offset: true });
 export const RoleKey = z.enum([
@@ -332,7 +338,7 @@ export const Alert = RecordBase.extend({
 export const Source = z.object({
   id: Id,
   name: z.string(),
-  url: z.url(),
+  url: PublicSourceUrl,
   definition: z.string(),
   geography: z.string(),
   capability: Capability,
@@ -344,7 +350,7 @@ export const Evidence = RecordBase.extend({
   snapshot_id: Id,
   title: z.string(),
   text: z.string(),
-  url: z.url().optional(),
+  url: PublicSourceUrl.optional(),
   issued_at: Timestamp.optional(),
   retrieved_at: Timestamp,
   valid_from: Timestamp.optional(),

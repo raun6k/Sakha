@@ -8,6 +8,7 @@ import {
 import {
   ApiError,
   Event,
+  Evidence,
   operations,
   Quantity,
   ScenarioRequest,
@@ -54,4 +55,22 @@ describe("shared operation contracts", () => {
     for (const error of errorExamples)
       expect(ApiError.safeParse(error).success).toBe(true);
   });
+});
+
+it("rejects executable and local-file URLs in evidence links", () => {
+  for (const url of [
+    "javascript:alert(1)",
+    "file:///private/local-records",
+    "data:text/html,example",
+  ])
+    expect(
+      Evidence.safeParse({ ...(responseExamples.getEvidence as object), url })
+        .success,
+    ).toBe(false);
+  expect(
+    Evidence.safeParse({
+      ...(responseExamples.getEvidence as object),
+      url: "https://example.org/source.pdf",
+    }).success,
+  ).toBe(true);
 });

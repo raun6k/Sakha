@@ -4,6 +4,7 @@
     "includes": [
       "**",
       "!docs",
+      "!.local",
       "!**/dist",
       "!**/node_modules",
       "!pnpm-lock.yaml"

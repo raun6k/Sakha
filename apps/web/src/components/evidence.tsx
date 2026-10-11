@@ -98,6 +98,17 @@ export function SourceDetails({
                   </dd>
                 </div>
                 <div>
+                  <dt>Valid from</dt>
+                  <dd>
+                    <DateText
+                      value={evidence.data.valid_from}
+                      precision={
+                        evidence.data.source_time_precision ?? "unknown"
+                      }
+                    />
+                  </dd>
+                </div>
+                <div>
                   <dt>Valid until</dt>
                   <dd>
                     <DateText
@@ -132,7 +143,31 @@ export function SourceDetails({
                     {evidence.data.method_version}
                   </dd>
                 </div>
+                {evidence.data.citation.page ||
+                evidence.data.citation.section ? (
+                  <div>
+                    <dt>Document location</dt>
+                    <dd>
+                      {evidence.data.citation.page
+                        ? `Page ${evidence.data.citation.page}`
+                        : ""}
+                      {evidence.data.citation.section
+                        ? ` · ${evidence.data.citation.section}`
+                        : ""}
+                    </dd>
+                  </div>
+                ) : null}
               </dl>
+              {evidence.data.url ? (
+                <a
+                  className="button secondary"
+                  href={evidence.data.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open cited document <ExternalLink size={16} />
+                </a>
+              ) : null}
             </>
           ) : evidence.isPending ? (
             <Loading />
