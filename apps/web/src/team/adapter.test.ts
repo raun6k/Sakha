@@ -24,16 +24,16 @@ describe("team charter adapter", () => {
     ]);
     expect(team.find((mate) => mate.id === "sakha")?.color).toBe("#1F6F43");
     expect(team.find((mate) => mate.id === "megha")?.status).toMatch(
-      /^🌧 upcoming mm next 7 days · monsoon reading is on the way · no alerts$/,
+      /^🌧 \d+ mm next 7 days · monsoon reading is on the way · no alerts$/,
     );
     expect(team.find((mate) => mate.id === "megha")?.status).not.toContain(
       "El Niño: El Niño",
     );
     expect(team.find((mate) => mate.id === "jal")?.status).toBe(
-      "💧 Wait · next water: soon",
+      "💧 Wait · next water: not needed",
     );
     expect(team.find((mate) => mate.id === "kheti")?.status).toBe(
-      "🌱 crop · stage not noted · watch: field check",
+      "🌱 crop · Getting ready to sow · watch: field check",
     );
     expect(team.find((mate) => mate.id === "paisa")?.status).toBe(
       "₹ crop mandi price and MSP are on the team strip",
