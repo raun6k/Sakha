@@ -193,7 +193,7 @@ test("mobile team keeps every teammate on screen and old routes leave the comman
     page.getByRole("heading", { name: "Your farm team" }),
   ).toBeVisible();
   await expect(page.getByText("Megha").first()).toBeVisible();
-  await page.goto(`${origin}/agents/crop_care`);
+  await page.goto(`${origin}/agents/legacy`);
   await expect(
     page.getByRole("heading", { name: "Your farm team" }),
   ).toBeVisible();
@@ -245,11 +245,12 @@ test("thinking renders no empty agent bubble and first text becomes one canonica
     page.getByRole("heading", { name: "First model text", exact: true }),
   ).toBeVisible();
   releaseFinal();
-  await expect(page.locator(".answer-card")).toHaveCount(1);
-  await expect(page.locator(".message.agent")).toHaveCount(0);
-  await page.reload();
-  await expect(page.locator(".answer-card")).toHaveCount(1);
   await expect(
     page.getByRole("heading", { name: "First model text", exact: true }),
-  ).toBeVisible();
+  ).toHaveCount(1);
+  await expect(page.locator(".message.agent")).toHaveCount(0);
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "First model text", exact: true }),
+  ).toHaveCount(1);
 });

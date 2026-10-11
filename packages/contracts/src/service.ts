@@ -177,6 +177,7 @@ export const operations = {
     c.Run,
   ),
   getHome: op("GET", "/farms/:farmId/home", empty, c.Home),
+  getTeam: op("GET", "/farms/:farmId/team", empty, z.array(c.Teammate)),
   listSources: op("GET", "/sources", empty, z.array(c.Source)),
   getSource: op("GET", "/sources/:sourceId", empty, c.Source),
   getEvidence: op(

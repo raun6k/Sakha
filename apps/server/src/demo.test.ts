@@ -19,7 +19,7 @@ it("seeds a coherent demo once without inventing external evidence", () => {
   const s = context();
   const farm = initializeDemo(s);
   expect(initializeDemo(s).id).toBe(farm.id);
-  expect(s.farm.listFacts(farm.id)).toHaveLength(10);
+  expect(s.farm.listFacts(farm.id)).toHaveLength(11);
   const plan = s.domain.plan(farm.id);
   expect(plan.active_revision?.status).toBe("approved");
   expect(plan.proposed_revisions).toHaveLength(0);
@@ -49,6 +49,44 @@ it("serves the seeded team on the home screen", async () => {
   expect(body.sections.weather[0].title).toContain("mm");
   expect(body.sections.climate[0].title).toContain("El Niño");
   expect(body.sections.plan.active_revision.summary).toContain("₹");
+  expect(body.sections.plan.active_revision.cost_inr).toBeGreaterThan(0);
+  const team = await s.app.inject({
+    url: `/api/v1/farms/${seeded.profile.id}/team`,
+    headers: { "x-sakha-session": s.sessionToken },
+  });
+  expect(team.statusCode).toBe(200);
+  const mates = team.json().data as {
+    id: string;
+    role_line: string;
+    status_line: string;
+  }[];
+  expect(mates.map((mate) => mate.id)).toEqual([
+    "sakha",
+    "megha",
+    "jal",
+    "kheti",
+    "paisa",
+  ]);
+  const megha = mates.find((mate) => mate.id === "megha");
+  const paisa = mates.find((mate) => mate.id === "paisa");
+  expect(megha?.status_line).toContain("1.3 mm");
+  expect(megha?.status_line).toContain("El Niño +2.16");
+  expect(megha?.status_line).not.toContain("El Niño: El Niño");
+  expect(megha?.role_line.length).toBeGreaterThan(20);
+  expect(paisa?.status_line).toContain("₹6,175/qtl");
+  expect(paisa?.status_line).toContain("MSP ₹5,708");
+  const roleKeys = new Set(
+    s.store
+      .list("message", seeded.profile.id)
+      .map((row) => (row as { role_key: string }).role_key),
+  );
+  expect([...roleKeys].sort()).toEqual([
+    "jal",
+    "kheti",
+    "megha",
+    "paisa",
+    "sakha",
+  ]);
   const messages = s.store.list("message", seeded.profile.id).map(
     (row) =>
       row as {

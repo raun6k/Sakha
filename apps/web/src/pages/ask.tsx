@@ -95,7 +95,7 @@ export function Thread({
   const conversations = useRead(
     "listConversations",
     { params: { farmId }, input: { role_key: role.key } },
-    Boolean(farmId && ready),
+    Boolean(farmId),
   );
   const [createdId, setCreatedId] = useState("");
   const conversationId = createdId || conversations.data?.items[0]?.id || "";
@@ -269,9 +269,14 @@ export function Thread({
     recognizer.start();
   };
   const voiceReady = speechRecognizer() !== undefined;
+  const history =
+    messages.data?.items.filter(
+      (message) =>
+        message.author === "farmer" || message.text.trim().length > 0,
+    ) ?? [];
   const body = (
     <>
-      {ready ? null : (
+      {!ready && history.length === 0 ? (
         <section className="card setup-note">
           <FieldArt mood="calm" />
           <p>
@@ -283,57 +288,61 @@ export function Thread({
             {t(lang, "farm")}
           </Link>
         </section>
-      )}
-      {ready ? (
+      ) : null}
+      {ready || history.length > 0 ? (
         <>
-          <div className="suggestions">
-            {(
-              [
-                "suggestionsRain",
-                "suggestionsCrop",
-                "suggestionsWater",
-              ] as const
-            ).map((key) => (
-              <button
-                type="button"
-                className="button secondary"
-                key={key}
-                onClick={() => setText(role.key, t(lang, key))}
-              >
-                {t(lang, key)}
-              </button>
-            ))}
-          </div>
+          {ready ? (
+            <div className="suggestions">
+              {(
+                [
+                  "suggestionsRain",
+                  "suggestionsCrop",
+                  "suggestionsWater",
+                ] as const
+              ).map((key) => (
+                <button
+                  type="button"
+                  className="button secondary"
+                  key={key}
+                  onClick={() => setText(role.key, t(lang, key))}
+                >
+                  {t(lang, key)}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <div className="transcript">
-            {messages.data?.items
-              .filter(
-                (message) =>
-                  message.author === "farmer" || message.text.trim().length > 0,
-              )
-              .map((message) =>
-                message.author === "farmer" ? (
-                  <article className="message farmer" key={message.id}>
-                    <strong>{t(lang, "you")}</strong>
-                    <p>{message.text}</p>
-                  </article>
-                ) : (
-                  <AnswerCard
-                    key={message.id}
-                    card={cardFromAnswer({
-                      text:
-                        message.id === stream.partialMessageIds[runId] &&
-                        (stream.partial[runId]?.length ?? 0) >
-                          message.text.length
-                          ? (stream.partial[runId] ?? message.text)
-                          : message.text,
-                      agent: mate,
-                      evidence: message.context.evidence,
-                      createdAt: message.created_at,
-                      lang,
-                    })}
-                  />
-                ),
-              )}
+            {history.map((message) =>
+              message.author === "farmer" ? (
+                <article className="message farmer" key={message.id}>
+                  <strong>{t(lang, "you")}</strong>
+                  <p>{message.text}</p>
+                </article>
+              ) : (
+                <AnswerCard
+                  key={message.id}
+                  card={cardFromAnswer({
+                    text:
+                      message.id === stream.partialMessageIds[runId] &&
+                      (stream.partial[runId]?.length ?? 0) > message.text.length
+                        ? (stream.partial[runId] ?? message.text)
+                        : message.text,
+                    agent: mate,
+                    evidence: message.context.evidence,
+                    createdAt: message.created_at,
+                    consulted: message.context.consulted,
+                    citations: message.context.citations?.map((item) => ({
+                      title: item.title,
+                      url: item.url,
+                      adapter: item.source,
+                      fetched_at: item.fetched_at,
+                    })),
+                    stored: message.context.card ?? message.card,
+                    lang,
+                  })}
+                />
+              ),
+            )}
             {partial && !partialAlreadyShown ? (
               <article className="message agent partial">
                 <strong>{t(lang, "sakha")}</strong>
@@ -341,73 +350,79 @@ export function Thread({
               </article>
             ) : null}
           </div>
-          {thinking ? (
-            <p className="thinking" role="status">
-              {t(lang, "thinking")}
-            </p>
-          ) : null}
-          {run.data?.pending
-            .filter((item) => item.status === "pending")
-            .map((item) => (
-              <Pending
-                key={item.id}
-                farmId={farmId}
-                runId={run.data?.id ?? ""}
-                item={item}
-              />
-            ))}
-          {run.data?.failure ? (
-            <ErrorNotice error={new Error(run.data.failure.message)} />
-          ) : null}
-          {active &&
-          run.data?.capabilities.some(
-            (cap) => cap.key === "cancel" && cap.status === "enabled",
-          ) ? (
-            <button
-              type="button"
-              className="button secondary"
-              disabled={cancel.isPending}
-              onClick={() =>
-                cancel.mutate({ expected_version: run.data?.version ?? 1 })
-              }
-            >
-              {t(lang, "stop")}
-            </button>
-          ) : null}
-          <ErrorNotice error={error ?? messages.error} />
-          <form
-            className="composer"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void send(text);
-            }}
-          >
-            <textarea
-              aria-label={t(lang, "yourQuestion")}
-              value={text}
-              rows={2}
-              placeholder={t(lang, "questionPlaceholder")}
-              onChange={(event) => setText(role.key, event.target.value)}
-            />
-            {voiceReady ? (
-              <button
-                type="button"
-                className="button secondary icon-button"
-                aria-label={t(lang, "speak")}
-                onClick={speak}
+          {ready ? (
+            <>
+              {thinking ? (
+                <p className="thinking" role="status">
+                  {t(lang, "thinking")}
+                </p>
+              ) : null}
+              {run.data?.pending
+                .filter((item) => item.status === "pending")
+                .map((item) => (
+                  <Pending
+                    key={item.id}
+                    farmId={farmId}
+                    runId={run.data?.id ?? ""}
+                    item={item}
+                  />
+                ))}
+              {run.data?.failure ? (
+                <ErrorNotice error={new Error(run.data.failure.message)} />
+              ) : null}
+              {active &&
+              run.data?.capabilities.some(
+                (cap) => cap.key === "cancel" && cap.status === "enabled",
+              ) ? (
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={cancel.isPending}
+                  onClick={() =>
+                    cancel.mutate({ expected_version: run.data?.version ?? 1 })
+                  }
+                >
+                  {t(lang, "stop")}
+                </button>
+              ) : null}
+              <form
+                className="composer"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void send(text);
+                }}
               >
-                <Mic size={22} />
-              </button>
-            ) : null}
-            <button
-              className="button icon-button"
-              type="submit"
-              aria-label={t(lang, "send")}
-              disabled={busy || Boolean(active) || !text.trim()}
-            >
-              <Send size={22} />
-            </button>
-          </form>
+                <textarea
+                  aria-label={t(lang, "yourQuestion")}
+                  value={text}
+                  rows={2}
+                  placeholder={t(lang, "questionPlaceholder")}
+                  onChange={(event) => setText(role.key, event.target.value)}
+                />
+                {voiceReady ? (
+                  <button
+                    type="button"
+                    className="button secondary icon-button"
+                    aria-label={t(lang, "speak")}
+                    onClick={speak}
+                  >
+                    <Mic size={22} />
+                  </button>
+                ) : null}
+                <button
+                  className="button icon-button"
+                  type="submit"
+                  aria-label={t(lang, "send")}
+                  disabled={busy || Boolean(active) || !text.trim()}
+                >
+                  <Send size={22} />
+                </button>
+              </form>
+            </>
+          ) : (
+            <p className="quiet">{t(lang, "savedAnswers")}</p>
+          )}
+          <ErrorNotice error={error ?? messages.error} />
         </>
       ) : null}
     </>

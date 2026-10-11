@@ -125,7 +125,7 @@ export function isTeamId(value: string): value is TeamId {
 }
 
 function mmText(value: number | undefined) {
-  if (value === undefined || Number.isNaN(value)) return "—";
+  if (value === undefined || Number.isNaN(value)) return undefined;
   if (value < 1) return value.toFixed(1).replace(/\.0$/, "");
   return String(Math.round(value));
 }
@@ -204,6 +204,13 @@ export function buildTeam(home: Home | undefined, lang: Lang): TeammateView[] {
         ? "जल्द पूछें"
         : "soon";
 
+  const rainLabel = mmText(rainMm);
+  const ensoText =
+    anomaly === undefined
+      ? lang === "hi"
+        ? "मानसून का आंकड़ा आ रहा है"
+        : "monsoon reading is on the way"
+      : `${enso} ${anomaly > 0 ? "+" : ""}${anomaly} °C`;
   const status: Record<TeamId, string> = {
     sakha:
       lang === "hi"
@@ -211,20 +218,20 @@ export function buildTeam(home: Home | undefined, lang: Lang): TeammateView[] {
         : `${open.length} actions this week · top: ${top}`,
     megha:
       lang === "hi"
-        ? `🌧 अगले 7 दिन ${mmText(rainMm)} मिमी · अल नीनो: ${enso} · ${alert}`
-        : `🌧 ${mmText(rainMm)} mm next 7 days · El Niño: ${enso} · ${alert}`,
+        ? `🌧 अगले 7 दिन ${rainLabel ?? "का आंकड़ा"} मिमी · ${ensoText} · ${alert}`
+        : `🌧 ${rainLabel ?? "upcoming"} mm next 7 days · ${ensoText} · ${alert}`,
     jal:
       lang === "hi"
-        ? `💧 मिट्टी मापी नहीं · अगला पानी: ${nextWater} · ${mmText(rainMm)} मिमी`
-        : `💧 Soil not measured · next water: ${nextWater} · ${mmText(rainMm)} mm`,
+        ? `💧 इंतज़ार · अगला पानी: ${nextWater}`
+        : `💧 Wait · next water: ${nextWater}`,
     kheti:
       lang === "hi"
-        ? `🌱 ${crop} दिन — · ${stageText} · ध्यान: नोट नहीं`
-        : `🌱 ${crop} day — · ${stageText} · watch: not noted`,
+        ? `🌱 ${crop} · ${stageText} · ध्यान: खेत की जाँच`
+        : `🌱 ${crop} · ${stageText} · watch: field check`,
     paisa:
       lang === "hi"
-        ? `₹ ${crop} ₹—/क्विंटल आपकी मंडी · एमएसपी अभी नहीं`
-        : `₹ ${crop} ₹—/qtl at your mandi (—) · MSP not in yet`,
+        ? `₹ ${crop} का मंडी भाव और एमएसपी टीम की पट्टी पर`
+        : `₹ ${crop} mandi price and MSP are on the team strip`,
   };
 
   return teamIds.map((id) => ({
@@ -236,6 +243,31 @@ export function buildTeam(home: Home | undefined, lang: Lang): TeammateView[] {
     accent: charter[id].accent,
     roleKey: roleKeyFor[id],
   }));
+}
+
+/** Prefer the team endpoint: full role lines and seeded status, no doubled El Niño label. */
+export function applyRemoteTeam(
+  local: TeammateView[],
+  remote?: {
+    id: string;
+    name: string;
+    role_line: string;
+    status_line: string;
+    color: string;
+  }[],
+): TeammateView[] {
+  if (!remote?.length) return local;
+  return local.map((mate) => {
+    const next = remote.find((item) => item.id === mate.id);
+    if (!next) return mate;
+    return {
+      ...mate,
+      name: next.name || mate.name,
+      role: next.role_line || mate.role,
+      status: next.status_line || mate.status,
+      color: next.color || mate.color,
+    };
+  });
 }
 
 /** Overlay a future `{ id, name, role, status, color }` team list without dropping local fallbacks. */
@@ -383,10 +415,11 @@ export function cardFromAnswer(input: {
   createdAt?: string;
   consulted?: string[];
   citations?: CardSource[];
+  stored?: Partial<FarmerCard>;
   lang: Lang;
   catalogName?: (sourceId: string) => string | undefined;
 }): FarmerCard {
-  const parsed = parseCard(input.text);
+  const parsed = input.stored?.headline ? input.stored : parseCard(input.text);
   const sourceIds = input.evidence?.map((item) => item.source_id) ?? [];
   const consulted = [
     ...new Set([
@@ -533,8 +566,15 @@ export function cardFromHome(home: Home, lang: Lang): FarmerCard {
       ? tasks.map((task) => plainSentence(task.title, action))
       : [action],
     why,
+    cost_inr: revision?.cost_inr,
+    benefit_inr: revision?.benefit_inr,
     risk: home.sections.weather.length || rain ? riskKind : undefined,
-    confidence: weather?.freshness.status === "fresh" ? "medium" : undefined,
+    confidence:
+      weather?.freshness.status === "fresh"
+        ? "medium"
+        : home.sections.weather.length || rain
+          ? "low"
+          : undefined,
     sources: sources.length ? sources : [{ title: t(lang, "notCited") }],
     consulted,
     reviewed_by: "sakha",

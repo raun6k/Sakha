@@ -98,6 +98,7 @@ export function initializeDemo(services: Services, cache?: DemoCache) {
         value: `Cotton on ${brief.cotton_ha} ha`,
       },
       { category: "F02", key: "crop_stage", value: "Pods drying" },
+      { category: "F02", key: "sowing_date", value: SOWING },
       {
         category: "F02",
         key: "crop_condition",
@@ -108,7 +109,7 @@ export function initializeDemo(services: Services, cache?: DemoCache) {
       {
         category: "F03",
         key: "water_availability",
-        value: "Not measured",
+        value: "Borewell kept for the cotton while the soybean dries",
       },
       {
         category: "F04",
@@ -159,7 +160,7 @@ export function initializeDemo(services: Services, cache?: DemoCache) {
         farm_id: farmId,
         purpose:
           "Demo-only external processing of this seeded farm profile and its conversation text",
-        fields: entries.map((entry) => entry.key),
+        fields: [...entries.map((entry) => entry.key), "conversation"],
         roles: c.RoleKey.options,
         external_processing: true,
         storage: "persistent",
@@ -183,6 +184,8 @@ export function initializeDemo(services: Services, cache?: DemoCache) {
           farm_id: farmId,
           title: rec.title,
           summary: `${rec.action} Harvest labour ₹${rupee(rec.cost_inr)}. The modal-minus-minimum gap on ${rec.quintals} quintal is ₹${rupee(rec.benefit_inr)}, not a promised sale.`,
+          cost_inr: rec.cost_inr,
+          benefit_inr: rec.benefit_inr,
           tasks: [
             task(
               `Cut ${brief.soybean_ha} ha soybean`,

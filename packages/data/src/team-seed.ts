@@ -1,33 +1,13 @@
 import { type AgentId, Card } from "@sakha/contracts";
 import type { DemoCache } from "./adapters.js";
 
-/** Charter ids. The first role that exists at seed time is the one that gets the rows. */
+/** The five stored role ids. */
 export const TEAM = [
-  {
-    id: "sakha",
-    name: "Sakha",
-    roleCandidates: ["sakha", "chief_of_staff"],
-  },
-  {
-    id: "megha",
-    name: "Megha",
-    roleCandidates: ["megha", "weather"],
-  },
-  {
-    id: "jal",
-    name: "Jal",
-    roleCandidates: ["jal", "water"],
-  },
-  {
-    id: "kheti",
-    name: "Kheti",
-    roleCandidates: ["kheti", "crop_care", "crop_planning"],
-  },
-  {
-    id: "paisa",
-    name: "Paisa",
-    roleCandidates: ["paisa", "farm_finance", "market"],
-  },
+  { id: "sakha", name: "Sakha" },
+  { id: "megha", name: "Megha" },
+  { id: "jal", name: "Jal" },
+  { id: "kheti", name: "Kheti" },
+  { id: "paisa", name: "Paisa" },
 ] as const;
 
 const SOWING_DATE = "2026-06-20";
@@ -72,7 +52,7 @@ export type SeedStatus = { id: AgentId; name: string; line: string };
 
 export type FindingDraft = {
   team_id: AgentId;
-  role_key: string;
+  role_key: AgentId;
   title: string;
   summary: string;
   source_id: string;
@@ -80,22 +60,12 @@ export type FindingDraft = {
 };
 
 export type TeamSeed = {
-  roles: Partial<Record<AgentId, string>>;
+  roles: Record<AgentId, AgentId>;
   memory: SeedMemory[];
   threads: SeedThread[];
   statuses: SeedStatus[];
   findings: FindingDraft[];
 };
-
-export function resolveTeamRole(
-  teamId: AgentId,
-  availableRoles: readonly string[],
-) {
-  const member = TEAM.find((item) => item.id === teamId);
-  if (!member) return null;
-  const available = new Set(availableRoles);
-  return member.roleCandidates.find((role) => available.has(role)) ?? null;
-}
 
 function rupee(value: number) {
   return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(
@@ -176,10 +146,7 @@ function memory(
   return { team_id: teamId, key, value, text: `${key}: ${text}` };
 }
 
-export function buildTeamSeed(
-  cache: DemoCache,
-  availableRoles: readonly string[],
-): TeamSeed {
+export function buildTeamSeed(cache: DemoCache): TeamSeed {
   const brief = cache.brief;
   const rec = cache.recommendation;
   const quotes = cache.market.data.quotes;
@@ -275,17 +242,18 @@ export function buildTeamSeed(
     adapter: "farmer_report",
     fetched_at: cache.forecast.fetched_at,
   };
-  const enso = `active (+${brief.oni_anom_c} °C)`;
   const actions = [
     `Cut the ${brief.soybean_ha} ha soybean on ${pretty(plusDays(today, 1))}–${pretty(plusDays(today, 5))}.`,
     `Sell at ${brief.market} aiming for ₹${rupee(brief.modal_inr)} per quintal, not the ₹${rupee(brief.min_inr)} minimum (${cachedLabel}).`,
     `Give the soybean 0 mm and keep the borewell for ${brief.cotton_ha} ha cotton.`,
   ];
-  const roles: Partial<Record<AgentId, string>> = {};
-  for (const member of TEAM) {
-    const role = resolveTeamRole(member.id, availableRoles);
-    if (role) roles[member.id] = role;
-  }
+  const roles: Record<AgentId, AgentId> = {
+    sakha: "sakha",
+    megha: "megha",
+    jal: "jal",
+    kheti: "kheti",
+    paisa: "paisa",
+  };
 
   const weekly = card({
     agent: "sakha",
@@ -959,17 +927,17 @@ export function buildTeamSeed(
     {
       id: "megha",
       name: "Megha",
-      line: `🌧 ${brief.forecast_rain_7d_mm} mm next 7 days · El Niño: ${enso} · no alerts`,
+      line: `🌧 ${brief.forecast_rain_7d_mm} mm next 7 days · ${brief.enso_phase} +${brief.oni_anom_c} °C · no alerts`,
     },
     {
       id: "jal",
       name: "Jal",
-      line: "💧 Soil moisture not measured · next water: not needed · 0 mm",
+      line: `💧 Wait · ${brief.forecast_rain_7d_mm} mm rain, ${brief.forecast_et0_7d_mm} mm evaporation · next water: not needed`,
     },
     {
       id: "kheti",
       name: "Kheti",
-      line: `🌱 Soybean day ${das} · pods drying · watch: none reported`,
+      line: `🌱 Soybean day ${das} · pods drying · watch: no pest reported`,
     },
     {
       id: "paisa",
@@ -977,36 +945,32 @@ export function buildTeamSeed(
       line: `₹ ${selected.commodity} ₹${rupee(brief.modal_inr)}/qtl at ${brief.market} (${arrow} ${trendPct}% wk, ${cachedLabel}) · MSP ₹${rupee(brief.msp_inr)}`,
     },
   ];
-  const climateRole = availableRoles.includes("climate")
-    ? "climate"
-    : (roles.megha ?? "weather");
-  const findings: FindingDraft[] = [];
-  if (roles.megha)
-    findings.push({
+  const findings: FindingDraft[] = [
+    {
       team_id: "megha",
-      role_key: roles.megha,
+      role_key: "megha",
       title: `${brief.forecast_rain_7d_mm} mm in the next 7 days`,
       summary: `Open-Meteo, fetched ${fetched}, totals ${brief.forecast_rain_7d_mm} mm of rain and ${brief.forecast_et0_7d_mm} mm of evaporation from ${pretty(today)} to ${pretty(weekEnd)}. A forecast, not a field gauge.`,
       source_id: "W05",
       assumptions: [],
-    });
-  findings.push({
-    team_id: "megha",
-    role_key: climateRole,
-    title: `El Niño · ONI +${brief.oni_anom_c} °C`,
-    summary: `NOAA ${brief.oni_season} ${brief.oni_year} Oceanic Niño Index is +${brief.oni_anom_c} °C, fetched ${fetched}. A second NOAA index for ${brief.roni_label} is +${brief.roni_c} °C. Not a local rainfall forecast.`,
-    source_id: "C08",
-    assumptions: ["El Niño here means the index is at or above +0.5 °C"],
-  });
-  if (roles.sakha)
-    findings.push({
+    },
+    {
+      team_id: "megha",
+      role_key: "megha",
+      title: `El Niño · ONI +${brief.oni_anom_c} °C`,
+      summary: `NOAA ${brief.oni_season} ${brief.oni_year} Oceanic Niño Index is +${brief.oni_anom_c} °C, fetched ${fetched}. A second NOAA index for ${brief.roni_label} is +${brief.roni_c} °C. Not a local rainfall forecast.`,
+      source_id: "C08",
+      assumptions: ["El Niño here means the index is at or above +0.5 °C"],
+    },
+    {
       team_id: "sakha",
-      role_key: roles.sakha,
+      role_key: "sakha",
       title: rec.title,
       summary: `${rec.action} Harvest labour ₹${rupee(rec.cost_inr)}. The modal-minus-minimum gap on ${rec.quintals} quintal is ₹${rupee(rec.benefit_inr)}, not a promised sale.`,
       source_id: "M01",
       assumptions: rec.assumptions,
-    });
+    },
+  ];
 
   return { roles, memory: memoryRows, threads, statuses, findings };
 }

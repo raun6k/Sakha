@@ -637,6 +637,16 @@ export function FarmPage() {
     );
   const list = facts.data?.items ?? [];
   const show = (key: string) => factText(latestFact(list, key), lang);
+  const intended = show("intended_crop");
+  const companion = show("companion_crop");
+  const nextCrop =
+    intended === t(lang, "notAdded") && companion !== t(lang, "notAdded")
+      ? companion
+      : intended;
+  const nextLabel =
+    nextCrop === companion && companion !== t(lang, "notAdded")
+      ? t(lang, "alsoGrowing")
+      : t(lang, "nextCrop");
   return (
     <div className="route-content">
       <header className="home-intro">
@@ -681,8 +691,8 @@ export function FarmPage() {
         />
         <FactRow
           icon={<Sprout size={22} />}
-          label={t(lang, "nextCrop")}
-          value={show("intended_crop")}
+          label={nextLabel}
+          value={nextCrop}
         />
         <button
           type="button"

@@ -189,6 +189,15 @@ export const Role = z.object({
   /** Avatar key: sakha, megha, jal, kheti, paisa. */
   avatar: z.string().optional(),
 });
+export const Teammate = z.object({
+  id: AgentId,
+  name: z.string().min(1),
+  role_line: z.string().min(1),
+  status_line: z.string().min(1),
+  color: z.string().min(1),
+  avatar: z.string().min(1),
+});
+export type Teammate = z.infer<typeof Teammate>;
 export const CardSource = z.object({
   title: z.string().min(1),
   url: z.string().optional(),
@@ -373,6 +382,8 @@ export const PlanRevision = RecordBase.extend({
   ]),
   title: z.string(),
   summary: z.string(),
+  cost_inr: z.number().finite().optional(),
+  benefit_inr: z.number().finite().optional(),
   tasks: z.array(Task),
   findings: z.array(Id),
   evidence: z.array(EvidenceRef),

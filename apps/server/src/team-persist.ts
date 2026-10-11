@@ -16,7 +16,7 @@ export function persistTeamSeed(
   farmId: string,
   cache: DemoCache,
 ) {
-  const seed = buildTeamSeed(cache, c.RoleKey.options);
+  const seed = buildTeamSeed(cache);
   let tick = 0;
   const stamp = () => new Date(Date.now() + tick++).toISOString();
   for (const item of seed.memory) {
@@ -79,7 +79,26 @@ export function persistTeamSeed(
           author: message.author,
           text: message.text,
           status: "final",
-          context: { fact_versions: {}, evidence: [] },
+          context: {
+            fact_versions: {},
+            evidence: [],
+            citations: (message.card?.sources ?? []).flatMap((source) =>
+              source.url && /^https?:\/\//i.test(source.url)
+                ? [
+                    {
+                      url: source.url,
+                      title: source.title,
+                      snippet: source.title,
+                      source: source.adapter ?? source.title,
+                      fetched_at: source.fetched_at,
+                    },
+                  ]
+                : [],
+            ),
+            consulted: message.consulted,
+            reviewed_by: message.reviewed_by,
+            card: message.card,
+          },
           team_id:
             message.author === "agent"
               ? (message.card?.agent ?? thread.team_id)

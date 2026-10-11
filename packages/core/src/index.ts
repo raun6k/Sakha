@@ -174,6 +174,12 @@ export type RuntimeTurn = {
     dailyBrief: (question: string) => Promise<ConsultReply[]>;
     remember: (key: string, value: string) => Promise<{ key: string }>;
     recordWork: (description: string) => Promise<void>;
+    forecast: () => Promise<unknown>;
+    enso: () => Promise<unknown>;
+    irrigateOrWait: () => Promise<unknown>;
+    cropStage: () => Promise<unknown>;
+    mandi: () => Promise<unknown>;
+    msp: () => Promise<unknown>;
   };
 };
 export {

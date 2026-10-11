@@ -35,6 +35,37 @@ unless { principal.role == "paisa" };
 permit(principal is Sakha::Agent, action == Sakha::Action::"market", resource is Sakha::Resource)
 when { principal.farm == resource.farm && context.allowed && principal.role == "paisa" };
 
+// Owned data tools. Each adapter stays with the teammate who speaks for it.
+forbid(principal is Sakha::Agent, action == Sakha::Action::"forecast", resource is Sakha::Resource)
+unless { principal.role == "megha" };
+permit(principal is Sakha::Agent, action == Sakha::Action::"forecast", resource is Sakha::Resource)
+when { principal.farm == resource.farm && context.allowed && principal.role == "megha" };
+
+forbid(principal is Sakha::Agent, action == Sakha::Action::"enso", resource is Sakha::Resource)
+unless { principal.role == "megha" };
+permit(principal is Sakha::Agent, action == Sakha::Action::"enso", resource is Sakha::Resource)
+when { principal.farm == resource.farm && context.allowed && principal.role == "megha" };
+
+forbid(principal is Sakha::Agent, action == Sakha::Action::"irrigate", resource is Sakha::Resource)
+unless { principal.role == "jal" };
+permit(principal is Sakha::Agent, action == Sakha::Action::"irrigate", resource is Sakha::Resource)
+when { principal.farm == resource.farm && context.allowed && principal.role == "jal" };
+
+forbid(principal is Sakha::Agent, action == Sakha::Action::"crop_stage", resource is Sakha::Resource)
+unless { principal.role == "kheti" };
+permit(principal is Sakha::Agent, action == Sakha::Action::"crop_stage", resource is Sakha::Resource)
+when { principal.farm == resource.farm && context.allowed && principal.role == "kheti" };
+
+forbid(principal is Sakha::Agent, action == Sakha::Action::"mandi", resource is Sakha::Resource)
+unless { principal.role == "paisa" };
+permit(principal is Sakha::Agent, action == Sakha::Action::"mandi", resource is Sakha::Resource)
+when { principal.farm == resource.farm && context.allowed && principal.role == "paisa" };
+
+forbid(principal is Sakha::Agent, action == Sakha::Action::"msp", resource is Sakha::Resource)
+unless { principal.role == "paisa" };
+permit(principal is Sakha::Agent, action == Sakha::Action::"msp", resource is Sakha::Resource)
+when { principal.farm == resource.farm && context.allowed && principal.role == "paisa" };
+
 permit(principal is Sakha::Agent, action == Sakha::Action::"write_profile", resource is Sakha::Resource)
 when { principal.farm == resource.farm && context.allowed && principal.role == "sakha" };
 

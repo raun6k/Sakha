@@ -179,10 +179,41 @@ export function runMockEval(): string[] {
   }
   try {
     authorize(paisa, "market", resource, true);
+    authorize(megha, "forecast", resource, true);
+    authorize(megha, "enso", resource, true);
+    authorize(
+      { ...megha, id: "jal", roleKey: "jal" },
+      "irrigate",
+      resource,
+      true,
+    );
+    authorize(
+      { ...megha, id: "kheti", roleKey: "kheti" },
+      "crop_stage",
+      resource,
+      true,
+    );
+    authorize(paisa, "mandi", resource, true);
+    authorize(paisa, "msp", resource, true);
   } catch (error) {
     failures.push(
-      `paisa market permit failed: ${error instanceof Error ? error.message : error}`,
+      `owned tool permit failed: ${error instanceof Error ? error.message : error}`,
     );
+  }
+  for (const [who, action] of [
+    [megha, "mandi"],
+    [megha, "msp"],
+    [paisa, "forecast"],
+    [paisa, "enso"],
+  ] as const) {
+    try {
+      authorize(who, action, resource, true);
+      failures.push(`scope: ${who.roleKey} ${action} was allowed`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (!message.includes(`Cedar denied ${action}`))
+        failures.push(`scope: ${message}`);
+    }
   }
   return failures;
 }

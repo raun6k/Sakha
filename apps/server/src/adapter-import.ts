@@ -119,7 +119,7 @@ export function importAdapterCache(
       );
     }),
   );
-  const seed = buildTeamSeed(loaded, c.RoleKey.options);
+  const seed = buildTeamSeed(loaded);
   const bySource = (sourceId: string, variable?: string) =>
     saved.find(
       (item, index) =>

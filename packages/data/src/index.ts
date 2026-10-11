@@ -1370,4 +1370,14 @@ export type {
   SeedThread,
   TeamSeed,
 } from "./team-seed.js";
-export { buildTeamSeed, resolveTeamRole, TEAM } from "./team-seed.js";
+export { buildTeamSeed, TEAM } from "./team-seed.js";
+export {
+  cropStageFromFacts,
+  ensoReading,
+  forecastReading,
+  irrigateOrWait,
+  mandiReading,
+  mspReading,
+  ownedToolOwner,
+  toolOwner,
+} from "./owned-tools.js";

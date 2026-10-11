@@ -274,6 +274,31 @@ export function createApp(options: {
               (role) => role.key === params.roleKey,
             );
           }
+          if (name === "getTeam") {
+            const farmId = params.farmId ?? "";
+            farm.assertFarm(farmId);
+            const lines = new Map(
+              store.list("team_status", farmId).flatMap((raw) => {
+                const parsed = z
+                  .object({ team_id: c.AgentId, line: z.string() })
+                  .safeParse(raw);
+                return parsed.success
+                  ? [[parsed.data.team_id, parsed.data.line] as const]
+                  : [];
+              }),
+            );
+            return roleProjection(farmId).map((role) =>
+              c.Teammate.parse({
+                id: role.key,
+                name: role.name,
+                role_line: role.role_line || role.description,
+                status_line:
+                  lines.get(role.key) || role.status_line || role.description,
+                color: role.color || "#1F6F43",
+                avatar: role.avatar || role.key,
+              }),
+            );
+          }
           if (name === "getHome") {
             const farmId = params.farmId ?? "";
             const profile = farm.assertFarm(farmId);

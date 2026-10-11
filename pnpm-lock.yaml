@@ -386,6 +386,9 @@ importers:
       '@sakha/core':
         specifier: workspace:*
         version: link:../core
+      '@sakha/data':
+        specifier: workspace:*
+        version: link:../data
       '@sakha/farm':
         specifier: workspace:*
         version: link:../farm
@@ -404,6 +407,9 @@ importers:
       '@sakha/core':
         specifier: workspace:*
         version: link:../core
+      '@sakha/data':
+        specifier: workspace:*
+        version: link:../data
       '@sakha/farm':
         specifier: workspace:*
         version: link:../farm

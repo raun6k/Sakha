@@ -1,18 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { loadDemoCache } from "./adapters.js";
-import { buildTeamSeed, resolveTeamRole, TEAM } from "./team-seed.js";
-
-const OLD_ROLES = [
-  "chief_of_staff",
-  "climate",
-  "weather",
-  "crop_planning",
-  "crop_care",
-  "water",
-  "market",
-  "farm_finance",
-  "government_support",
-];
+import { buildTeamSeed, TEAM } from "./team-seed.js";
 
 function words(value: string) {
   return value.trim().split(/\s+/).filter(Boolean).length;
@@ -28,7 +16,7 @@ function sentences(value: string) {
 describe("team charter seed", () => {
   const cache = loadDemoCache();
 
-  it("maps the five charter ids onto the roles that exist", () => {
+  it("stores the five role ids and no older directory", () => {
     expect(TEAM.map((member) => member.id)).toEqual([
       "sakha",
       "megha",
@@ -36,23 +24,26 @@ describe("team charter seed", () => {
       "kheti",
       "paisa",
     ]);
-    expect(resolveTeamRole("sakha", OLD_ROLES)).toBe("chief_of_staff");
-    expect(resolveTeamRole("megha", OLD_ROLES)).toBe("weather");
-    expect(resolveTeamRole("jal", OLD_ROLES)).toBe("water");
-    expect(resolveTeamRole("kheti", OLD_ROLES)).toBe("crop_care");
-    expect(resolveTeamRole("paisa", OLD_ROLES)).toBe("farm_finance");
-    for (const member of TEAM)
-      expect(
-        resolveTeamRole(
-          member.id,
-          TEAM.map((item) => item.id),
-        ),
-      ).toBe(member.id);
-    expect(resolveTeamRole("jal", ["crop_care"])).toBeNull();
+    const seed = buildTeamSeed(cache);
+    expect(seed.roles).toEqual({
+      sakha: "sakha",
+      megha: "megha",
+      jal: "jal",
+      kheti: "kheti",
+      paisa: "paisa",
+    });
+    expect(seed.findings.map((item) => item.role_key)).toEqual([
+      "megha",
+      "megha",
+      "sakha",
+    ]);
+    expect(JSON.stringify(seed)).not.toMatch(
+      /chief_of_staff|crop_planning|farm_finance|government_support/,
+    );
   });
 
   it("shapes memory, status lines and cards from the cached readings", () => {
-    const seed = buildTeamSeed(cache, OLD_ROLES);
+    const seed = buildTeamSeed(cache);
     const keys = seed.memory.map((item) => item.key);
     for (const key of [
       "profile.district",
@@ -100,13 +91,16 @@ describe("team charter seed", () => {
     expect(lines.megha).toContain(
       `${cache.brief.forecast_rain_7d_mm} mm next 7 days`,
     );
-    expect(lines.megha).toContain("El Niño:");
-    expect(lines.megha).toContain("no alerts");
-    expect(lines.jal).toBe(
-      "💧 Soil moisture not measured · next water: not needed · 0 mm",
+    expect(lines.megha).toContain(
+      `El Niño +${cache.brief.oni_anom_c} °C`,
     );
+    expect(lines.megha).not.toContain("El Niño: El Niño");
+    expect(lines.megha).toContain("no alerts");
+    expect(lines.jal).toContain("Wait");
+    expect(lines.jal).toContain(`${cache.brief.forecast_rain_7d_mm} mm rain`);
+    expect(lines.jal).not.toMatch(/—|not measured/);
     expect(lines.kheti).toMatch(
-      /^🌱 Soybean day \d+ · pods drying · watch: none reported$/,
+      /^🌱 Soybean day \d+ · pods drying · watch: no pest reported$/,
     );
     expect(lines.paisa).toContain("₹6,175/qtl at Nagpur APMC");
     expect(lines.paisa).toContain("cached");

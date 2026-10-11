@@ -15,6 +15,12 @@ action "web_search" appliesTo {principal: [Farmer,Agent],resource: [Resource],co
 action "fetch_page" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
 action "consult" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
 action "market" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "forecast" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "enso" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "irrigate" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "crop_stage" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "mandi" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
+action "msp" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
 action "write_profile" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
 action "payment" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};
 action "submit_form" appliesTo {principal: [Farmer,Agent],resource: [Resource],context: {allowed: Bool,privateGrant: Bool,domain: String,specialist: String}};

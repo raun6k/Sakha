@@ -21,13 +21,18 @@ import {
 } from "../farmer";
 import { useLang } from "../language";
 import { useFarmId, useRead } from "../services/context";
-import { buildTeam, cardFromHome } from "../team/adapter";
+import { applyRemoteTeam, buildTeam, cardFromHome } from "../team/adapter";
 
 export function HomePage() {
   const { lang } = useLang();
   const farmId = useFarmId();
   const q = useRead(
     "getHome",
+    { params: { farmId }, input: {} },
+    Boolean(farmId),
+  );
+  const remote = useRead(
+    "getTeam",
     { params: { farmId }, input: {} },
     Boolean(farmId),
   );
@@ -53,7 +58,7 @@ export function HomePage() {
   const facts = home.sections.context;
   const risk = buildRisk(home);
   const advice = cardFromHome(home, lang);
-  const team = buildTeam(home, lang);
+  const team = applyRemoteTeam(buildTeam(home, lang), remote.data);
   const rain = pickRainSeries(home.insights.series);
   const crop = factText(latestFact(facts, "current_crop"), lang);
   const cropShown = crop === t(lang, "notAdded") ? undefined : crop;

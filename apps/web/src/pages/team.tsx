@@ -5,7 +5,12 @@ import { State } from "../components/ui";
 import { t } from "../copy";
 import { useLang } from "../language";
 import { useFarmId, useRead } from "../services/context";
-import { buildTeam, isTeamId, roleKeyFor } from "../team/adapter";
+import {
+  applyRemoteTeam,
+  buildTeam,
+  isTeamId,
+  roleKeyFor,
+} from "../team/adapter";
 import { Thread } from "./ask";
 
 export function TeamPage() {
@@ -18,6 +23,11 @@ export function TeamPage() {
     Boolean(farmId),
   );
   const mate = mateId && isTeamId(mateId) ? mateId : "sakha";
+  const remote = useRead(
+    "getTeam",
+    { params: { farmId }, input: {} },
+    Boolean(farmId),
+  );
   const role = useRead(
     "getAgent",
     { params: { farmId, roleKey: roleKeyFor[mate] }, input: {} },
@@ -38,8 +48,9 @@ export function TeamPage() {
         </State>
       </div>
     );
-  const team = buildTeam(home.data, lang).filter((item) => item.id !== "sakha");
-  const current = buildTeam(home.data, lang).find((item) => item.id === mate);
+  const roster = applyRemoteTeam(buildTeam(home.data, lang), remote.data);
+  const team = roster.filter((item) => item.id !== "sakha");
+  const current = roster.find((item) => item.id === mate);
   if (mate !== "sakha")
     return (
       <div className="route-content">

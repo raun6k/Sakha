@@ -68,6 +68,8 @@ const strings = {
     thinking: "Sakha is thinking…",
     assistantOff:
       "Sakha cannot answer yet. On My Farm, read the one setup line. Your notes stay on this phone.",
+    savedAnswers:
+      "These are saved answers from your team. A new question waits until the assistant is on.",
     assistantNeedsYes:
       "To answer, Sakha needs your say-so to use the notes you saved. Turn that on under My Farm.",
     suggestionsRain: "Will it rain this week?",
@@ -102,6 +104,7 @@ const strings = {
     land: "Land",
     waterSource: "Water",
     nextCrop: "Next crop",
+    alsoGrowing: "Also in the field",
     stage: "Stage",
     howCropLooks: "How the crop looks",
     notAdded: "Not added yet",
@@ -112,7 +115,7 @@ const strings = {
       "Allow Sakha to answer using the notes you saved on this phone.",
     turnOn: "Turn on the assistant",
     assistantSetup:
-      "The assistant is not switched on for this computer yet. Ask the person who set up Sakha to turn it on. Your notes stay here.",
+      "New questions need the assistant switched on for this computer. Saved answers from your team are already on the Team tab.",
     checkingAssistant: "Checking the assistant…",
     whatChanged: "What changed?",
     yourNote: "Your note",
@@ -254,6 +257,7 @@ const strings = {
     thinking: "साखा सोच रहा है…",
     assistantOff:
       "साखा अभी जवाब नहीं दे सकता। मेरे खेत पर एक सेटअप पंक्ति पढ़ें। आपकी बातें इस फोन पर रहती हैं।",
+    savedAnswers: "ये आपकी टीम के सहेजे जवाब हैं। नया सवाल सहायक चालू होने पर पूछें।",
     assistantNeedsYes:
       "जवाब के लिए साखा को आपकी सहेजी बातें इस्तेमाल करने की सहमति चाहिए। मेरे खेत पर इसे चालू करें।",
     suggestionsRain: "क्या इस हफ्ते बारिश होगी?",
@@ -287,6 +291,7 @@ const strings = {
     land: "ज़मीन",
     waterSource: "पानी",
     nextCrop: "अगली फसल",
+    alsoGrowing: "खेत में साथ में",
     stage: "अवस्था",
     howCropLooks: "फसल कैसी है",
     notAdded: "अभी नहीं जोड़ा",
@@ -296,7 +301,7 @@ const strings = {
     assistantYes: "साखा को इस फोन पर सहेजी बातों से जवाब देने दें।",
     turnOn: "सहायक चालू करें",
     assistantSetup:
-      "इस कंप्यूटर पर सहायक अभी चालू नहीं है। जिसने साखा लगाया है उससे चालू करने को कहें। आपकी बातें यहीं रहती हैं।",
+      "नया सवाल पूछने के लिए इस कंप्यूटर पर सहायक चालू होना चाहिए। टीम के सहेजे जवाब टीम वाले पन्ने पर पहले से हैं।",
     checkingAssistant: "सहायक की जाँच हो रही है…",
     whatChanged: "क्या बदला?",
     yourNote: "आपकी बात",

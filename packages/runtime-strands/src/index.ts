@@ -7,6 +7,7 @@ import {
   type RuntimeCapabilities,
   type RuntimeTurn,
 } from "@sakha/core";
+import { toolOwner } from "@sakha/data";
 import { DomainError } from "@sakha/farm";
 import { Agent, tool } from "@strands-agents/sdk";
 import { BedrockModel } from "@strands-agents/sdk/models/bedrock";
@@ -260,7 +261,55 @@ function sdkDriver(
         return deniedOrJson(() => turn.tools.recordWork(input.description));
       },
     }),
+    tool({
+      name: "openmeteo_forecast",
+      description:
+        "Megha only. Open-Meteo rain, temperature, and ET0 for this farm, live or cached.",
+      inputSchema: z.object({}).strict(),
+      callback: async () => deniedOrJson(() => turn.tools.forecast()),
+    }),
+    tool({
+      name: "noaa_enso_status",
+      description:
+        "Megha only. NOAA El Niño state for this season, live or cached.",
+      inputSchema: z.object({}).strict(),
+      callback: async () => deniedOrJson(() => turn.tools.enso()),
+    }),
+    tool({
+      name: "irrigate_or_wait",
+      description:
+        "Jal only. Compare forecast rain with ET0 and say irrigate or wait.",
+      inputSchema: z.object({}).strict(),
+      callback: async () => deniedOrJson(() => turn.tools.irrigateOrWait()),
+    }),
+    tool({
+      name: "crop_stage",
+      description: "Kheti only. Crop and stage from this farm's saved facts.",
+      inputSchema: z.object({}).strict(),
+      callback: async () => deniedOrJson(() => turn.tools.cropStage()),
+    }),
+    tool({
+      name: "agmarknet_prices",
+      description: "Paisa only. Mandi prices for this crop, live or cached.",
+      inputSchema: z.object({}).strict(),
+      callback: async () => deniedOrJson(() => turn.tools.mandi()),
+    }),
+    tool({
+      name: "msp_table",
+      description: "Paisa only. Official MSP for this crop.",
+      inputSchema: z.object({}).strict(),
+      callback: async () => deniedOrJson(() => turn.tools.msp()),
+    }),
   ];
+  const visible = (role: c.RoleKey, name: string) => {
+    if (
+      ["propose_plan", "request_specialist", "record_work"].includes(name) &&
+      role !== "sakha"
+    )
+      return false;
+    const owner = toolOwner(name);
+    return !owner || owner === role;
+  };
   const model = createModel(config, key);
   const lead = turn.run.role_key === "sakha";
   const teammateTools = lead
@@ -270,11 +319,7 @@ function sdkDriver(
           systemPrompt: charterInstructions(id),
           tools: tools.filter((item) => {
             const name = "name" in item ? String(item.name) : "";
-            return ![
-              "propose_plan",
-              "request_specialist",
-              "record_work",
-            ].includes(name);
+            return visible(id, name);
           }),
           printer: false,
           toolExecutor: "sequential" as const,
@@ -330,7 +375,14 @@ function sdkDriver(
   const agent = new Agent({
     model,
     systemPrompt: turn.instructions,
-    tools: [...tools, ...teammateTools, ...(daily ? [daily] : [])],
+    tools: [
+      ...tools.filter((item) => {
+        const name = "name" in item ? String(item.name) : "";
+        return visible(turn.run.role_key, name);
+      }),
+      ...teammateTools,
+      ...(daily ? [daily] : []),
+    ],
     toolExecutor: "sequential",
     printer: false,
     messages: turn.messages.slice(0, -1).map((message) => ({

@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import * as c from "@sakha/contracts";
 import type { Runtime, RuntimeCapabilities, RuntimeTurn } from "@sakha/core";
+import { toolOwner } from "@sakha/data";
 import { DomainError } from "@sakha/farm";
 import { z } from "zod";
 
@@ -177,6 +178,12 @@ export const gatewaySchemas = {
     })
     .strict(),
   record_work: z.object({ description: z.string().min(1).max(2000) }).strict(),
+  openmeteo_forecast: z.object({}).strict(),
+  noaa_enso_status: z.object({}).strict(),
+  irrigate_or_wait: z.object({}).strict(),
+  crop_stage: z.object({}).strict(),
+  agmarknet_prices: z.object({}).strict(),
+  msp_table: z.object({}).strict(),
 };
 export async function invokeScopedTool(
   turn: RuntimeTurn,
@@ -233,6 +240,24 @@ export async function invokeScopedTool(
         gatewaySchemas.record_work.parse(args).description,
       );
       return { decision: "deny" };
+    case "openmeteo_forecast":
+      gatewaySchemas.openmeteo_forecast.parse(args);
+      return turn.tools.forecast();
+    case "noaa_enso_status":
+      gatewaySchemas.noaa_enso_status.parse(args);
+      return turn.tools.enso();
+    case "irrigate_or_wait":
+      gatewaySchemas.irrigate_or_wait.parse(args);
+      return turn.tools.irrigateOrWait();
+    case "crop_stage":
+      gatewaySchemas.crop_stage.parse(args);
+      return turn.tools.cropStage();
+    case "agmarknet_prices":
+      gatewaySchemas.agmarknet_prices.parse(args);
+      return turn.tools.mandi();
+    case "msp_table":
+      gatewaySchemas.msp_table.parse(args);
+      return turn.tools.msp();
     default:
       throw new DomainError("permission_denied", "Unknown scoped tool");
   }
@@ -475,7 +500,10 @@ export class CodexRuntime implements Runtime {
               sakha: {
                 command: process.execPath,
                 required: true,
-                enabled_tools: Object.keys(gatewaySchemas),
+                enabled_tools: Object.keys(gatewaySchemas).filter((name) => {
+                  const owner = toolOwner(name);
+                  return !owner || owner === turn.run.role_key;
+                }),
                 default_tools_approval_mode: "approve",
                 args: mcpArgs,
                 env: {

@@ -25,7 +25,16 @@ import {
   specialistLabels,
   specialistNote,
 } from "@sakha/core";
-import type { createDataServices } from "@sakha/data";
+import {
+  type createDataServices,
+  cropStageFromFacts,
+  ensoReading,
+  forecastReading,
+  irrigateOrWait,
+  loadDemoCache,
+  mandiReading,
+  mspReading,
+} from "@sakha/data";
 import type { createDomainServices, createFarmServices } from "@sakha/farm";
 import { assertMutationAllowed, DomainError, load } from "@sakha/farm";
 import { z } from "zod";
@@ -499,7 +508,44 @@ export function createExecution(
       recordWork: async () => {
         check(run, "record_work");
       },
+      forecast: async () => {
+        check(run, "forecast");
+        return forecastReading(readings(run));
+      },
+      enso: async () => {
+        check(run, "enso");
+        return ensoReading(readings(run));
+      },
+      irrigateOrWait: async () => {
+        check(run, "irrigate");
+        const stage = cropStageFromFacts(authorizeSend(run)).stage;
+        return irrigateOrWait(readings(run), stage);
+      },
+      cropStage: async () => {
+        check(run, "crop_stage");
+        return cropStageFromFacts(authorizeSend(run), now().slice(0, 10));
+      },
+      mandi: async () => {
+        check(run, "mandi");
+        return mandiReading(readings(run));
+      },
+      msp: async () => {
+        check(run, "msp");
+        return mspReading(readings(run));
+      },
     };
+    function readings(run: c.Run) {
+      const profile = farm.assertFarm(run.farm_id);
+      const latitude = profile.location?.latitude;
+      const longitude = profile.location?.longitude;
+      if (latitude === undefined || longitude === undefined)
+        return loadDemoCache();
+      try {
+        return loadDemoCache({ latitude, longitude });
+      } catch {
+        return loadDemoCache();
+      }
+    }
   }
   async function consultAsLead(
     run: c.Run,

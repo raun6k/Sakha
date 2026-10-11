@@ -36,6 +36,12 @@ function turn(onText: (text: string) => Promise<void>): RuntimeTurn {
       dailyBrief: async () => [],
       remember: async () => ({ key: "note" }),
       recordWork: async () => {},
+      forecast: async () => ({}),
+      enso: async () => ({}),
+      irrigateOrWait: async () => ({}),
+      cropStage: async () => ({}),
+      mandi: async () => ({}),
+      msp: async () => ({}),
     },
   };
 }

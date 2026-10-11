@@ -7,6 +7,7 @@ import { t } from "../copy";
 import { plainSentence } from "../farmer";
 import { useLang } from "../language";
 import { useCommand, useFarmId, useRead } from "../services/context";
+import { rupeeText } from "../team/adapter";
 
 function Steps({ revision }: { revision: PlanRevision }) {
   const { lang } = useLang();
@@ -105,6 +106,15 @@ export function PlanPage() {
           </p>
           <h3>{t(lang, "steps")}</h3>
           <Steps revision={saved} />
+          {saved.cost_inr !== undefined || saved.benefit_inr !== undefined ? (
+            <p>
+              {t(lang, "cost")}{" "}
+              {rupeeText(saved.cost_inr, undefined, undefined, lang)}
+              {" · "}
+              {t(lang, "benefit")}{" "}
+              {rupeeText(saved.benefit_inr, undefined, undefined, lang)}
+            </p>
+          ) : null}
           <SourceBadge
             source={t(lang, "yourPlan")}
             updated={saved.updated_at}

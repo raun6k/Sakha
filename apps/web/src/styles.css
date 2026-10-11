@@ -413,9 +413,9 @@ main {
   text-decoration: none;
   color: inherit;
   display: grid;
-  grid-template-columns: 64px 1fr;
-  column-gap: 10px;
-  row-gap: 2px;
+  grid-template-columns: 72px minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 4px;
   align-items: start;
   box-shadow: var(--shadow);
 }
@@ -423,17 +423,20 @@ main {
   width: 64px;
   height: 64px;
   display: block;
+  flex: 0 0 auto;
 }
 .team-pill > * {
   min-width: 0;
 }
 .team-pill .avatar {
-  grid-row: 1 / span 3;
+  grid-row: 1 / -1;
+  width: 72px;
+  height: 72px;
 }
 .team-role {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  line-height: 1.35;
 }
 .team-pill em {
   font-style: normal;
@@ -628,11 +631,24 @@ main {
 
 .mate-head {
   display: flex;
-  gap: 14px;
+  gap: 16px;
   align-items: center;
+}
+.mate-head .avatar {
+  width: 96px;
+  height: 96px;
+  flex: 0 0 96px;
 }
 .mate-head h1 {
   font-size: 1.7rem;
+  margin: 0;
+}
+.mate-head p,
+.teammate-card p {
+  margin: 2px 0 0;
+  white-space: normal;
+  overflow: visible;
+  line-height: 1.35;
 }
 .teammate-grid {
   display: grid;

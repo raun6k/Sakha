@@ -1,0 +1,25 @@
+-- Stored role keys are the five farm-team ids. Scenario kinds such as crop_care stay as they are.
+UPDATE records SET payload = replace(payload, '"chief_of_staff"', '"sakha"');
+UPDATE records SET payload = replace(payload, '"crop_planning"', '"kheti"');
+UPDATE records SET payload = replace(payload, '"farm_finance"', '"paisa"');
+UPDATE records SET payload = replace(payload, '"government_support"', '"paisa"');
+UPDATE records SET payload = replace(payload, '"role_key":"climate"', '"role_key":"megha"');
+UPDATE records SET payload = replace(payload, '"role_key":"weather"', '"role_key":"megha"');
+UPDATE records SET payload = replace(payload, '"role_key":"crop_care"', '"role_key":"kheti"');
+UPDATE records SET payload = replace(payload, '"role_key":"water"', '"role_key":"jal"');
+UPDATE records SET payload = replace(payload, '"role_key":"market"', '"role_key":"paisa"');
+UPDATE memory_fts SET role_key = 'sakha' WHERE role_key = 'chief_of_staff';
+UPDATE memory_fts SET role_key = 'megha' WHERE role_key IN ('climate', 'weather');
+UPDATE memory_fts SET role_key = 'jal' WHERE role_key = 'water';
+UPDATE memory_fts SET role_key = 'kheti' WHERE role_key IN ('crop_planning', 'crop_care');
+UPDATE memory_fts SET role_key = 'paisa' WHERE role_key IN ('market', 'farm_finance', 'government_support');
+UPDATE inbox SET sender = 'sakha' WHERE sender = 'chief_of_staff';
+UPDATE inbox SET recipient = 'sakha' WHERE recipient = 'chief_of_staff';
+UPDATE inbox SET sender = 'megha' WHERE sender IN ('climate', 'weather');
+UPDATE inbox SET recipient = 'megha' WHERE recipient IN ('climate', 'weather');
+UPDATE inbox SET sender = 'jal' WHERE sender = 'water';
+UPDATE inbox SET recipient = 'jal' WHERE recipient = 'water';
+UPDATE inbox SET sender = 'kheti' WHERE sender IN ('crop_planning', 'crop_care');
+UPDATE inbox SET recipient = 'kheti' WHERE recipient IN ('crop_planning', 'crop_care');
+UPDATE inbox SET sender = 'paisa' WHERE sender IN ('market', 'farm_finance', 'government_support');
+UPDATE inbox SET recipient = 'paisa' WHERE recipient IN ('market', 'farm_finance', 'government_support');

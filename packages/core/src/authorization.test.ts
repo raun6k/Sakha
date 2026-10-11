@@ -63,6 +63,18 @@ it("permits Paisa market and Sakha consult, and denies Megha using either", () =
     farmId: "a",
     roleKey: "sakha" as const,
   };
+  const jal = {
+    kind: "agent" as const,
+    id: "jal",
+    farmId: "a",
+    roleKey: "jal" as const,
+  };
+  const kheti = {
+    kind: "agent" as const,
+    id: "kheti",
+    farmId: "a",
+    roleKey: "kheti" as const,
+  };
   authorize(paisa, "market", resource, true);
   authorize(sakha, "consult", resource, true, false, { specialist: "megha" });
   authorize(megha, "web_search", resource, true);
@@ -71,8 +83,29 @@ it("permits Paisa market and Sakha consult, and denies Megha using either", () =
   });
   authorize(sakha, "memory", resource, true, false, { namespace: "sakha" });
   authorize(sakha, "write_profile", resource, true);
+  authorize(megha, "forecast", resource, true);
+  authorize(megha, "enso", resource, true);
+  authorize(jal, "irrigate", resource, true);
+  authorize(kheti, "crop_stage", resource, true);
+  authorize(paisa, "mandi", resource, true);
+  authorize(paisa, "msp", resource, true);
   expect(() => authorize(megha, "market", resource, true)).toThrow(
     /Cedar denied market/,
+  );
+  expect(() => authorize(paisa, "forecast", resource, true)).toThrow(
+    /Cedar denied forecast/,
+  );
+  expect(() => authorize(megha, "irrigate", resource, true)).toThrow(
+    /Cedar denied irrigate/,
+  );
+  expect(() => authorize(jal, "crop_stage", resource, true)).toThrow(
+    /Cedar denied crop_stage/,
+  );
+  expect(() => authorize(kheti, "mandi", resource, true)).toThrow(
+    /Cedar denied mandi/,
+  );
+  expect(() => authorize(megha, "msp", resource, true)).toThrow(
+    /Cedar denied msp/,
   );
   expect(() =>
     authorize(megha, "consult", resource, true, false, { specialist: "paisa" }),
