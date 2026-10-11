@@ -558,7 +558,13 @@ export function QuickUpdate({
     </Modal>
   );
 }
-function LocationEdit({ farm, onClose }: { farm: Farm; onClose: () => void }) {
+export function LocationEdit({
+  farm,
+  onClose,
+}: {
+  farm: Farm;
+  onClose: () => void;
+}) {
   const mutation = useCommand("updateFarm", { farmId: farm.id });
   const [state, setState] = useState(farm.location?.state ?? "");
   const [district, setDistrict] = useState(farm.location?.district ?? "");

@@ -2,6 +2,7 @@ import {
   Bell,
   CalendarDays,
   ChartNoAxesCombined,
+  ChevronDown,
   HelpCircle,
   History,
   Home,
@@ -15,7 +16,13 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet } from "react-router";
-import { bootstrapFarm, useRead, useService } from "../services/context";
+import { LocationEdit } from "../pages/farm";
+import {
+  bootstrapFarm,
+  useFarmId,
+  useRead,
+  useService,
+} from "../services/context";
 import { Modal } from "./ui";
 
 const primary = [
@@ -47,6 +54,15 @@ function NavItems({ items }: { items: typeof primary }) {
 export function Shell() {
   const { demo } = useService();
   const [more, setMore] = useState(false);
+  const [agentsOpen, setAgentsOpen] = useState(false);
+  const [mobileAgents, setMobileAgents] = useState(false);
+  const [locationOpen, setLocationOpen] = useState(false);
+  const farmId = useFarmId();
+  const agents = useRead(
+    "listAgents",
+    { params: { farmId }, input: {} },
+    Boolean(farmId),
+  );
   const bootstrap = useRead("bootstrap", { input: {} });
   useEffect(() => {
     document.documentElement.dataset.reducedMotion = String(
@@ -67,7 +83,42 @@ export function Shell() {
           </div>
         </Link>
         <nav aria-label="Primary navigation">
-          <NavItems items={primary} />
+          {primary.map((item) =>
+            item.to === "/agents" ? (
+              <div key={item.to}>
+                <button
+                  type="button"
+                  className="agents-toggle"
+                  aria-expanded={agentsOpen}
+                  aria-controls="sidebar-agents"
+                  onClick={() => setAgentsOpen(!agentsOpen)}
+                >
+                  <Users size={20} />
+                  <span>Agents</span>
+                  <ChevronDown size={17} />
+                </button>
+                {agentsOpen ? (
+                  <div id="sidebar-agents" className="agent-links">
+                    {agents.data?.map((role) => (
+                      <NavLink
+                        key={role.key}
+                        to={
+                          role.key === "chief_of_staff"
+                            ? "/ask"
+                            : `/agents/${role.key}?tab=chat`
+                        }
+                      >
+                        {role.name}
+                      </NavLink>
+                    ))}
+                    <Link to="/agents">View agent directory</Link>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <NavItems key={item.to} items={[item]} />
+            ),
+          )}
         </nav>
         <div className="sidebar-divider" />
         <nav className="secondary-nav" aria-label="Supporting pages">
@@ -84,11 +135,16 @@ export function Shell() {
       </aside>
       <div className="main-wrap">
         <div className="utility-bar">
-          <span>
+          <button
+            type="button"
+            className="location-button"
+            aria-label="Edit farm location"
+            onClick={() => setLocationOpen(true)}
+          >
             <MapPin size={15} />
             {farm?.location?.district ?? "Location not recorded"}
             {farm?.location?.state ? `, ${farm.location.state}` : ""}
-          </span>
+          </button>
           <button
             type="button"
             className="icon-button mobile-more"
@@ -110,6 +166,39 @@ export function Shell() {
             </Link>
           </div>
         ) : null}
+        <Modal
+          open={locationOpen}
+          onClose={() => setLocationOpen(false)}
+          title="Review farm location"
+        >
+          {farm ? (
+            <LocationEdit farm={farm} onClose={() => setLocationOpen(false)} />
+          ) : null}
+        </Modal>
+        <Modal
+          open={mobileAgents}
+          onClose={() => setMobileAgents(false)}
+          title="Your agents"
+        >
+          <nav className="more-nav">
+            {agents.data?.map((role) => (
+              <Link
+                key={role.key}
+                to={
+                  role.key === "chief_of_staff"
+                    ? "/ask"
+                    : `/agents/${role.key}?tab=chat`
+                }
+                onClick={() => setMobileAgents(false)}
+              >
+                {role.name}
+              </Link>
+            ))}
+            <Link to="/agents" onClick={() => setMobileAgents(false)}>
+              View agent directory
+            </Link>
+          </nav>
+        </Modal>
         {more ? (
           <Modal open onClose={() => setMore(false)} title="More in Sakha">
             <nav className="more-nav" aria-label="Supporting destinations">
@@ -131,7 +220,21 @@ export function Shell() {
         </footer>
       </div>
       <nav className="mobile-nav" aria-label="Mobile primary navigation">
-        <NavItems items={primary} />
+        {primary.map((item) =>
+          item.to === "/agents" ? (
+            <button
+              key={item.to}
+              type="button"
+              className="mobile-agents-button"
+              onClick={() => setMobileAgents(true)}
+            >
+              <Users size={20} />
+              <span>Agents</span>
+            </button>
+          ) : (
+            <NavItems key={item.to} items={[item]} />
+          ),
+        )}
       </nav>
     </div>
   );

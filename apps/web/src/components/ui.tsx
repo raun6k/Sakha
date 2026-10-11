@@ -238,10 +238,18 @@ export function quantityText(
 export function factValue(facts: Fact[], key: string) {
   return quantityText(facts.filter((f) => f.key === key).at(-1)?.value);
 }
-export function RoleCard({ role, info }: { role: Role; info?: () => void }) {
+export function RoleCard({
+  role,
+  info,
+  compact = false,
+}: {
+  role: Role;
+  info?: () => void;
+  compact?: boolean;
+}) {
   const cap = role.capabilities.find((c) => c.key === "chat");
   return (
-    <article className="role-card">
+    <article className={`role-card ${compact ? "role-card-compact" : ""}`}>
       <div className="section-head">
         <RoleIcon role={role.key} />
         <Badge tone={cap?.status === "enabled" ? "green" : "gold"}>
@@ -250,10 +258,18 @@ export function RoleCard({ role, info }: { role: Role; info?: () => void }) {
       </div>
       <h2>{role.name}</h2>
       <p>{role.description}</p>
-      <p className="role-question">“{role.questions[0]}”</p>
+      {compact ? null : <p className="role-question">“{role.questions[0]}”</p>}
       <div className="actions">
-        <Link className="text-link" to={`/agents/${role.key}`}>
-          Explore specialist <ArrowRight size={16} />
+        <Link
+          className="text-link"
+          to={
+            role.key === "chief_of_staff"
+              ? "/ask"
+              : `/agents/${role.key}?tab=chat`
+          }
+        >
+          {compact ? "Open chat" : "Chat with specialist"}{" "}
+          <ArrowRight size={16} />
         </Link>
         {info ? (
           <button

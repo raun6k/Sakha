@@ -8,11 +8,13 @@ import { createElement as h, StrictMode } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ChartCard } from "../components/evidence";
+import { Shell } from "../components/shell";
 import { ServiceContext } from "../services/context";
 import { createFixtureService } from "../services/fixture";
 import { useUi } from "../state/ui";
 import { AgentsPage, ConversationView } from "./agents";
 import { PlanPage, WorkConfirmation } from "./decisions";
+import { greeting, HomePage } from "./home";
 import { InsightsPage, SettingsPage } from "./support";
 
 function mount(
@@ -231,7 +233,7 @@ describe("evidence and privacy interactions", () => {
     mount(h(AgentsPage));
     await screen.findByRole("heading", { name: "Water & Irrigation" });
     expect(
-      screen.getAllByRole("link", { name: "Explore specialist" }),
+      screen.getAllByRole("link", { name: "Chat with specialist" }),
     ).toHaveLength(8);
     expect(
       screen.queryByRole("heading", { name: "Chief of Staff" }),
@@ -289,5 +291,43 @@ it("allows general specialist conversations without requiring optional private f
   });
   expect(request?.input).toMatchObject({
     fields: expect.not.arrayContaining(["F05", "F08"]),
+  });
+});
+
+describe("demo navigation and welcome", () => {
+  it("uses short time-based greetings", () => {
+    expect(greeting(8)).toBe("Good morning");
+    expect(greeting(12)).toBe("Good afternoon");
+    expect(greeting(19)).toBe("Good evening");
+  });
+  it("shows all nine agent cards and omits the profile name from the hero", async () => {
+    mount(h(HomePage));
+    await screen.findByRole("heading", {
+      name: /Good morning|Good afternoon|Good evening/,
+    });
+    expect(document.querySelectorAll(".role-card-compact")).toHaveLength(9);
+    expect(document.querySelector(".home-hero")?.textContent).not.toContain(
+      "validation",
+    );
+  });
+  it("expands nine agents and opens location editing from the top bar", async () => {
+    const user = userEvent.setup();
+    mount(h(Shell));
+    await user.click(
+      screen.getByRole("button", { name: "Agents", expanded: false }),
+    );
+    await waitFor(() =>
+      expect(document.querySelectorAll("#sidebar-agents a")).toHaveLength(10),
+    );
+    expect(
+      document.querySelector(
+        '#sidebar-agents a[href="/agents/climate?tab=chat"]',
+      ),
+    ).not.toBeNull();
+    await user.click(
+      screen.getByRole("button", { name: "Edit farm location" }),
+    );
+    await screen.findByRole("heading", { name: "Review farm location" });
+    expect(screen.getByLabelText("District")).toBeDefined();
   });
 });

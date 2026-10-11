@@ -585,28 +585,33 @@ export function ConversationView({ role }: { role: Role }) {
       ) : null}
       <div className="transcript">
         {messages.data?.items.length ? (
-          messages.data.items.map((message) => (
-            <article className={`message ${message.author}`} key={message.id}>
-              <header>
-                <RoleIcon
-                  role={message.author === "farmer" ? "crop_care" : role.key}
-                />
-                <strong>
-                  {message.author === "farmer" ? "You" : role.name}
-                </strong>
-                <small>
-                  <DateText value={message.created_at} />
-                </small>
-              </header>
-              <Markdown remarkPlugins={[remarkGfm]} skipHtml>
-                {message.text}
-              </Markdown>
-              <EvidenceLinks evidence={message.context.evidence} />
-              {message.status !== "final" ? (
-                <Badge tone="gold">{message.status}</Badge>
-              ) : null}
-            </article>
-          ))
+          messages.data.items
+            .filter(
+              (message) =>
+                message.author === "farmer" || message.text.trim().length > 0,
+            )
+            .map((message) => (
+              <article className={`message ${message.author}`} key={message.id}>
+                <header>
+                  <RoleIcon
+                    role={message.author === "farmer" ? "crop_care" : role.key}
+                  />
+                  <strong>
+                    {message.author === "farmer" ? "You" : role.name}
+                  </strong>
+                  <small>
+                    <DateText value={message.created_at} />
+                  </small>
+                </header>
+                <Markdown remarkPlugins={[remarkGfm]} skipHtml>
+                  {message.text}
+                </Markdown>
+                <EvidenceLinks evidence={message.context.evidence} />
+                {message.status !== "final" ? (
+                  <Badge tone="gold">{message.status}</Badge>
+                ) : null}
+              </article>
+            ))
         ) : (
           <Card title="What is on your mind?">
             <p>
@@ -615,13 +620,23 @@ export function ConversationView({ role }: { role: Role }) {
             </p>
           </Card>
         )}
-        {runId && stream.partial[runId] ? (
+        {runId && stream.partial[runId]?.trim() ? (
           <div className="message partial" aria-live="polite">
             <p>{stream.partial[runId]}</p>
             <Badge>Response in progress</Badge>
           </div>
         ) : null}
       </div>
+      {active && !stream.partial[runId]?.trim() ? (
+        <div className="thinking-indicator" role="status">
+          <MessageCircle size={18} />
+          {run.data?.state === "waiting_clarification"
+            ? "Waiting for your clarification"
+            : run.data?.state === "waiting_approval"
+              ? "Waiting for your review"
+              : `${role.name} is thinking…`}
+        </div>
+      ) : null}
       {run.data ? (
         <>
           <div className="notice" role="status">
@@ -1702,7 +1717,7 @@ export function WorkspacePage() {
     Boolean(farmId),
   );
   const [search, setSearch] = useSearchParams();
-  const tab = search.get("tab") ?? "about";
+  const tab = search.get("tab") ?? "chat";
   const preferences = useRead(
     "getPreferences",
     { params: { farmId, roleKey: key }, input: {} },

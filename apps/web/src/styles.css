@@ -1138,3 +1138,157 @@ main {
     gap: 14px;
   }
 }
+
+/* Accessible navigation disclosure and the Home welcome over the landscape. */
+.agents-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 14px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #e9f0e6;
+  text-align: left;
+}
+.agents-toggle:hover,
+.agents-toggle[aria-expanded="true"] {
+  background: #1c503e;
+}
+.agents-toggle span {
+  flex: 1;
+}
+.agents-toggle[aria-expanded="true"] > svg:last-child {
+  transform: rotate(180deg);
+}
+.sidebar .agent-links a {
+  padding: 9px 12px 9px 30px;
+  font-size: 0.88rem;
+}
+.location-button {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 8px;
+  border-radius: 6px;
+}
+.location-button:hover {
+  background: #edf1e7;
+  color: var(--green);
+}
+.home-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  min-height: 230px;
+  padding: 36px;
+  background-image:
+    linear-gradient(
+      90deg,
+      rgba(248, 247, 238, 0.97),
+      rgba(248, 247, 238, 0.83) 38%,
+      rgba(248, 247, 238, 0.12) 78%
+    ),
+    url("/assets/farm-panorama.webp");
+  color: #18382e;
+}
+.home-hero p {
+  margin-top: 14px;
+  max-width: 35ch;
+  font-family: Karla, sans-serif;
+  font-size: 1.08rem;
+  font-style: normal;
+}
+.home-hero .button {
+  flex-shrink: 0;
+  background: #f8f7ee;
+}
+.overview-card .stat-value {
+  font-size: 1.35rem;
+  line-height: 1.4;
+}
+.overview-summary {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.agents-compact-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.role-card-compact {
+  padding: 16px;
+}
+.role-card-compact h2 {
+  margin-top: 10px;
+  font-size: 1.03rem;
+}
+.role-card-compact p {
+  font-size: 0.9rem;
+  margin-top: 6px;
+}
+.role-card-compact .role-icon {
+  width: 36px;
+  height: 36px;
+}
+.role-card-compact .actions {
+  margin-top: 12px;
+}
+.thinking-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0;
+  color: var(--muted);
+}
+.mobile-agents-button {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--green);
+  font-size: 0.8rem;
+  padding: 10px;
+}
+@media (max-width: 1000px) {
+  .agents-compact-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 700px) {
+  .home-hero {
+    min-height: 240px;
+    padding: 24px;
+    flex-direction: column;
+    align-items: flex-start;
+    background-image:
+      linear-gradient(
+        90deg,
+        rgba(248, 247, 238, 0.96),
+        rgba(248, 247, 238, 0.65)
+      ),
+      url("/assets/farm-panorama.webp");
+  }
+  .agents-compact-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .role-card-compact {
+    padding: 14px;
+  }
+}
+@media (max-width: 380px) {
+  .agents-compact-grid {
+    grid-template-columns: 1fr;
+  }
+}

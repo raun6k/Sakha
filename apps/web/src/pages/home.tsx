@@ -4,18 +4,23 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { AlertDetails, ChartCard } from "../components/evidence";
 import {
-  Banner,
   Card,
   ErrorNotice,
   factValue,
   Loading,
-  PageHeading,
   RoleCard,
   RoleIcon,
   State,
 } from "../components/ui";
 import { useFarmId, useRead } from "../services/context";
 import { QuickUpdate } from "./farm";
+export function greeting(hour: number) {
+  return hour < 12
+    ? "Good morning"
+    : hour < 17
+      ? "Good afternoon"
+      : "Good evening";
+}
 export function HomePage() {
   const farmId = useFarmId();
   const q = useRead(
@@ -74,10 +79,11 @@ export function HomePage() {
   ];
   return (
     <div className="route-content">
-      <PageHeading
-        title={`Welcome back${home.farm.name ? ` to ${home.farm.name}` : ""}`}
-        description="Here is your recorded farm context and what needs a closer look."
-      >
+      <header className="farm-banner home-hero">
+        <div>
+          <h1>{greeting(new Date().getHours())}</h1>
+          <p>Healthier farms begin with clearer decisions.</p>
+        </div>
         <button
           type="button"
           className="button secondary"
@@ -85,14 +91,7 @@ export function HomePage() {
         >
           Update my farm
         </button>
-      </PageHeading>
-      <Banner text="Healthier farms begin with clearer decisions." />
-      <p className="chart-meta">
-        {new Date().toLocaleDateString("en-IN", { dateStyle: "full" })} ·{" "}
-        {factValue(facts, "situation")} · {factValue(facts, "current_crop")}
-        <br />
-        {home.sections.briefing.summary}
-      </p>
+      </header>
       <Card title="Ask Sakha">
         <p>
           Ask about weather, crop care, water or your next farming decision.
@@ -149,7 +148,7 @@ export function HomePage() {
                 <h2>{o.title}</h2>
               </div>
               <p className="stat-value">{o.value}</p>
-              <p>{o.description}</p>
+              <p className="overview-summary">{o.description}</p>
               <Link className="text-link" to={`/agents/${o.role}?tab=chat`}>
                 View specialist <ArrowRight size={15} />
               </Link>
@@ -267,16 +266,10 @@ export function HomePage() {
             View all agents <ArrowRight size={15} />
           </Link>
         </div>
-        <div className="grid-4">
-          {home.sections.agents
-            .filter((r) =>
-              ["weather", "crop_planning", "crop_care", "water"].includes(
-                r.key,
-              ),
-            )
-            .map((role) => (
-              <RoleCard key={role.key} role={role} />
-            ))}
+        <div className="agents-compact-grid">
+          {home.sections.agents.map((role) => (
+            <RoleCard key={role.key} role={role} compact />
+          ))}
         </div>
       </section>
       <Card
