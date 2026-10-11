@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import * as c from "@sakha/contracts";
 import {
+  assertMutationAllowed,
   type createFarmServices,
   DomainError,
   load,
@@ -21,6 +22,8 @@ export function createLifecycle(
     const farmId = params.farmId ?? "";
     if (name !== "getDeletion") farm.assertFarm(farmId);
     return store.transaction(() => {
+      if (c.operations[name].method !== "GET")
+        assertMutationAllowed(store, farmId);
       switch (name) {
         case "requestExport":
         case "requestDeletion": {
@@ -143,6 +146,20 @@ export function createLifecycle(
     store.transaction(() => {
       if (job.kind === "export") {
         const d = c.operations.requestExport.input.parse(request);
+        const size = z
+          .object({ bytes: z.number() })
+          .parse(
+            store.db
+              .prepare(
+                "SELECT COALESCE(SUM(length(payload)),0) AS bytes FROM records WHERE farm_id=?",
+              )
+              .get(farmId),
+          );
+        if (size.bytes > 12_000_000)
+          throw new DomainError(
+            "unavailable",
+            "Export input exceeds bounded local processing size",
+          );
         const rows = store.db
           .prepare("SELECT kind,payload FROM records WHERE farm_id=?")
           .all(farmId) as { kind: string; payload: string }[];

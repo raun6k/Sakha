@@ -30,7 +30,7 @@ export class Storage implements Store {
   constructor(path: string) {
     if (path !== ":memory:") {
       mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-      chmodSync(dirname(path), 0o700);
+      // Only create private directories; never change permissions on an existing user-selected parent.
     }
     this.db = new Database(path);
     this.db.pragma("journal_mode = WAL");
@@ -174,11 +174,18 @@ export class Storage implements Store {
     });
   }
   event(farmId: string, type: string, payload: unknown): void {
-    this.db
-      .prepare(
-        "INSERT INTO events(farm_id,type,payload,created_at) VALUES(?,?,?,?)",
-      )
-      .run(farmId, type, JSON.stringify(payload), new Date().toISOString());
+    this.transaction(() => {
+      this.db
+        .prepare(
+          "INSERT INTO events(farm_id,type,payload,created_at) VALUES(?,?,?,?)",
+        )
+        .run(farmId, type, JSON.stringify(payload), new Date().toISOString());
+      this.db
+        .prepare(
+          "DELETE FROM events WHERE farm_id=? AND seq < COALESCE((SELECT seq FROM events WHERE farm_id=? ORDER BY seq DESC LIMIT 1 OFFSET 4999),0)",
+        )
+        .run(farmId, farmId);
+    });
   }
   enqueue(farmId: string, kind: string, payload: unknown): string {
     const id = randomUUID();

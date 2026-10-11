@@ -98,3 +98,79 @@ it("validates image signatures and stores local photos without claiming analysis
   ).toMatchObject({ count: 0 });
   await s.app.close();
 });
+it("excludes private derived findings and histories from a nonprivate export", async () => {
+  const s = setup();
+  const sentinel = "SYNTHETIC_PRIVATE_SENTINEL";
+  s.store.put("finding", { ...s.farm.makeBase(s.farmId), summary: sentinel });
+  s.store.put("history", { ...s.farm.makeBase(s.farmId), summary: sentinel });
+  const job = c.Job.parse(
+    s.lifecycle.execute(
+      "requestExport",
+      { confirmed: true, include_private: false },
+      { farmId: s.farmId },
+    ),
+  );
+  await s.execution.tick();
+  expect(s.lifecycle.download(s.farmId, job.id).toString()).not.toContain(
+    sentinel,
+  );
+  const deletion = c.Job.parse(
+    s.lifecycle.execute(
+      "requestDeletion",
+      { confirmed: true, scope: "private_data" },
+      { farmId: s.farmId },
+    ),
+  );
+  await s.execution.tick();
+  expect(s.store.list("finding", s.farmId)).toHaveLength(0);
+  expect(
+    c.Job.parse(
+      s.lifecycle.execute(
+        "getDeletion",
+        {},
+        { farmId: s.farmId, jobId: deletion.id },
+      ),
+    ).status,
+  ).toBe("completed");
+  await s.app.close();
+});
+
+it("blocks owner-service mutations while deletion is queued", async () => {
+  const s = setup();
+  s.lifecycle.execute(
+    "requestDeletion",
+    { confirmed: true, scope: "private_data" },
+    { farmId: s.farmId },
+  );
+  expect(() =>
+    s.farm.execute(
+      "createField",
+      { name: "Rejected field" },
+      { farmId: s.farmId },
+    ),
+  ).toThrow("deletion is pending");
+  expect(s.store.list("field", s.farmId)).toHaveLength(0);
+  await s.app.close();
+});
+
+it("reports failed bounded exports through the authoritative lifecycle job", async () => {
+  const s = setup();
+  s.store.put("synthetic_large_record", {
+    ...s.farm.makeBase(s.farmId),
+    text: "x".repeat(12_100_000),
+  });
+  const job = c.Job.parse(
+    s.lifecycle.execute(
+      "requestExport",
+      { confirmed: true, include_private: true },
+      { farmId: s.farmId },
+    ),
+  );
+  await s.execution.tick();
+  expect(
+    c.Job.parse(
+      s.lifecycle.execute("getExport", {}, { farmId: s.farmId, jobId: job.id }),
+    ).status,
+  ).toBe("failed");
+  await s.app.close();
+});
