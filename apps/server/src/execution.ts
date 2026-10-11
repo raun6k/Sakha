@@ -5,7 +5,7 @@ import type { createCoreServices } from "@sakha/core";
 import { authorize, type Runtime, type RuntimeTurn } from "@sakha/core";
 import type { createDataServices } from "@sakha/data";
 import type { createDomainServices, createFarmServices } from "@sakha/farm";
-import { DomainError, load } from "@sakha/farm";
+import { assertMutationAllowed, DomainError, load } from "@sakha/farm";
 import { z } from "zod";
 import type { createLifecycle } from "./lifecycle.js";
 import type { Storage } from "./storage/database.js";
@@ -44,6 +44,7 @@ export function createExecution(
     return load(store, "run", run.id, run.farm_id, c.Run);
   }
   function authorizeSend(run: c.Run) {
+    assertMutationAllowed(store, run.farm_id);
     const grants = store
       .list("consent", run.farm_id)
       .map((x) => c.Consent.parse(x))
@@ -641,6 +642,36 @@ export function createExecution(
       });
     } catch (error) {
       if (stopped) return;
+      if (job.kind === "peer_delivery") {
+        const payload = z.object({ message_id: c.Id }).safeParse(job.payload);
+        if (
+          error instanceof DomainError &&
+          error.message === "Recipient busy" &&
+          job.attempts < 2
+        ) {
+          store.db
+            .prepare(
+              "UPDATE outbox SET status='queued',lease_until=NULL,available_at=?,outcome=? WHERE id=?",
+            )
+            .run(
+              new Date(
+                Date.parse(now()) + 2000 * (job.attempts + 1),
+              ).toISOString(),
+              JSON.stringify({
+                reason:
+                  "Recipient busy; bounded retry before any delivery effect",
+              }),
+              job.id,
+            );
+          return;
+        }
+        if (payload.success)
+          store.db
+            .prepare(
+              "UPDATE inbox SET status='failed' WHERE id=? AND status='queued'",
+            )
+            .run(payload.data.message_id);
+      }
       if (job.kind === "lifecycle") {
         const parsed = z.object({ job_id: c.Id }).safeParse(job.payload);
         if (parsed.success) {

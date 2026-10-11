@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build": "pnpm --filter @sakha/web build && tsc -p apps/server/tsconfig.build.json && tsx apps/server/src/build-assets.ts",
-    "start": "node apps/server/dist/apps/server/src/index.js",
+    "start": "node --conditions=sakha-release apps/server/dist/apps/server/src/index.js",
     "operator": "tsx apps/server/src/cli.ts"
   },
   "devDependencies": {

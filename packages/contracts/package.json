@@ -4,8 +4,14 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./examples": "./src/examples.ts"
+    ".": {
+      "sakha-release": "./dist/index.js",
+      "default": "./src/index.ts"
+    },
+    "./examples": {
+      "sakha-release": "./dist/examples.js",
+      "default": "./src/examples.ts"
+    }
   },
   "dependencies": {
     "zod": "4.6.5"

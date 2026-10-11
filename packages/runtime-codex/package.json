@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "exports": "./src/index.ts",
+  "exports": {
+    "sakha-release": "./dist/index.js",
+    "default": "./src/index.ts"
+  },
   "dependencies": {
     "@sakha/contracts": "workspace:*",
     "@sakha/core": "workspace:*",

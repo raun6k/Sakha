@@ -8,7 +8,8 @@ import { createApp } from "./app.js";
 const paths = envPaths("sakha", { suffix: "" });
 const { app, store, farm, dataServices } = createApp({
   databasePath:
-    process.env.SAKHA_DATABASE_PATH ?? join(paths.data, "sakha.sqlite"),
+    (process.env.SAKHA_DATABASE_PATH?.trim() || undefined) ??
+    join(paths.data, "sakha.sqlite"),
 });
 const [command, farmId, arg, extra] = process.argv.slice(2);
 try {

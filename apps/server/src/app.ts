@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import sse from "@fastify/sse";
+import fastifyStatic from "@fastify/static";
 import { roleDirectory } from "@sakha/agents-farming";
 import * as c from "@sakha/contracts";
 import type { Runtime } from "@sakha/core";
@@ -23,6 +24,7 @@ export function createApp(options: {
   devOrigins?: string[];
   runtime?: Runtime;
   startScheduler?: boolean;
+  webDirectory?: string;
 }) {
   const store = new Storage(options.databasePath);
   const farm = createFarmServices(store, randomUUID, () =>
@@ -162,17 +164,68 @@ export function createApp(options: {
               : false;
             return {
               ...role,
-              capabilities: role.capabilities.map((cap) =>
-                cap.key === "chat" && runtimeReady && !consent
-                  ? {
-                      ...cap,
-                      status: "needs_information" as const,
-                      reason:
-                        "Grant external processing of conversation text to this specialist",
-                      requirements: ["scoped external-processing consent"],
-                    }
-                  : cap,
-              ),
+              capabilities: [
+                ...role.capabilities.map((cap) =>
+                  cap.key === "chat" && runtimeReady && !consent
+                    ? {
+                        ...cap,
+                        status: "needs_information" as const,
+                        reason:
+                          "Grant external processing of conversation text to this specialist",
+                        requirements: ["scoped external-processing consent"],
+                      }
+                    : cap,
+                ),
+                ...(role.key === "market"
+                  ? [
+                      {
+                        key: "market_quotes",
+                        status:
+                          farmId &&
+                          store
+                            .list("series", farmId)
+                            .some((raw) =>
+                              c.Series.parse(raw).source_id.startsWith("M"),
+                            )
+                            ? ("enabled" as const)
+                            : ("unavailable" as const),
+                        reason:
+                          "Only attributable dated imported quotes are supported; live dashboard extraction is unverified",
+                        requirements: [
+                          "Verified dated market/commodity/grade/unit record",
+                        ],
+                      },
+                    ]
+                  : []),
+                ...(role.key === "government_support"
+                  ? [
+                      {
+                        key: "public_guidance",
+                        status:
+                          farmId &&
+                          store
+                            .list("evidence", farmId)
+                            .some((raw) =>
+                              c.Evidence.parse(raw).source_id.startsWith("G"),
+                            )
+                            ? ("enabled" as const)
+                            : ("unavailable" as const),
+                        reason:
+                          "Public source checklists only; current jurisdiction and individual applicability need review",
+                        requirements: [
+                          "Attributed applicable official document",
+                        ],
+                      },
+                      {
+                        key: "individual_eligibility",
+                        status: "unavailable" as const,
+                        reason:
+                          "Beneficiary access, individual eligibility and filing are unverified",
+                        requirements: ["Official farmer-specific verification"],
+                      },
+                    ]
+                  : []),
+              ],
             };
           });
         const perform = () => {
@@ -379,6 +432,25 @@ export function createApp(options: {
         stream.onClose(() => clearInterval(interval));
       },
     );
+  });
+  if (options.webDirectory) {
+    app.register(fastifyStatic, {
+      root: options.webDirectory,
+      prefix: "/",
+      wildcard: false,
+    });
+    app.setNotFoundHandler(async (request, reply) => {
+      if (request.method === "GET" && !request.url.startsWith("/api/"))
+        return reply.type("text/html").sendFile("index.html");
+      return reply
+        .code(404)
+        .send({ code: "not_found", message: "Route not found" });
+    });
+  }
+  app.addHook("onSend", async (request, reply, payload) => {
+    if (request.url.startsWith("/api/"))
+      reply.header("cache-control", "no-store");
+    return payload;
   });
   app.addHook("onClose", async () => {
     await execution.stop();

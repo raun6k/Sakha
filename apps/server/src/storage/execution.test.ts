@@ -175,3 +175,41 @@ it("rejects expired forecasts and wrong district evidence before publishing a fi
     await s.app.close();
   }
 });
+
+it("bounds busy-peer retries before delivery and records failed inbox outcome", async () => {
+  const s = setup();
+  grant(s);
+  const conversation = c.Conversation.parse(
+    s.core.execute(
+      "createConversation",
+      { role_key: "weather", title: "Busy recipient" },
+      { farmId: s.farmId },
+    ),
+  );
+  s.core.execute(
+    "submitTurn",
+    { text: "Recipient already waiting", evidence: [] },
+    { farmId: s.farmId, conversationId: conversation.id },
+  );
+  s.store.db.prepare("DELETE FROM outbox WHERE kind='agent_turn'").run();
+  s.core.saveRun({ ...s.run, state: "running" });
+  const peer = await s.execution
+    .tools(s.run)
+    .peer("weather", "Synthetic bounded request");
+  for (let attempt = 0; attempt < 3; attempt++) {
+    s.store.db
+      .prepare("UPDATE outbox SET available_at='1970-01-01T00:00:00Z'")
+      .run();
+    await s.execution.tick();
+  }
+  expect(
+    s.store.db.prepare("SELECT status FROM inbox WHERE id=?").get(peer.id),
+  ).toEqual({ status: "failed" });
+  expect(
+    s.store.db
+      .prepare("SELECT status,attempts FROM outbox WHERE kind='peer_delivery'")
+      .get(),
+  ).toEqual({ status: "failed", attempts: 3 });
+  expect(s.store.list("conversation", s.farmId)).toHaveLength(2);
+  await s.app.close();
+});
