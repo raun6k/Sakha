@@ -2,9 +2,8 @@ import { CalendarDays, Home, Leaf, Sprout, Users } from "lucide-react";
 import { useEffect } from "react";
 import { NavLink, Outlet } from "react-router";
 import { t } from "../copy";
-import { placeName } from "../farmer";
 import { useLang } from "../language";
-import { bootstrapFarm, useRead } from "../services/context";
+import { useRead } from "../services/context";
 import { LanguageToggle } from "./language-toggle";
 
 const tabs = [
@@ -17,8 +16,6 @@ const tabs = [
 export function Shell() {
   const { lang } = useLang();
   const bootstrap = useRead("bootstrap", { input: {} });
-  const farm = bootstrap.data ? bootstrapFarm(bootstrap.data) : undefined;
-  const place = placeName(farm?.location);
   useEffect(() => {
     document.documentElement.dataset.reducedMotion = String(
       bootstrap.data?.settings.reduced_motion ?? false,
@@ -41,7 +38,6 @@ export function Shell() {
             </div>
           </div>
           <div className="topbar-side">
-            {place ? <p className="place">{place}</p> : null}
             <LanguageToggle />
           </div>
         </div>

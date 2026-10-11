@@ -251,7 +251,6 @@ a {
     "WONK" 0;
 }
 .brand small,
-.place,
 .quiet,
 .eyebrow,
 .team-role,
@@ -285,10 +284,7 @@ a {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-.place {
-  margin: 0;
-  text-align: right;
+  margin-left: auto;
 }
 main {
   padding-bottom: calc(160px + env(safe-area-inset-bottom, 0px));
@@ -1235,19 +1231,25 @@ html {
 }
 
 @media (max-width: 719px) {
-  .topbar-side {
-    width: 100%;
-    justify-content: space-between;
+  .topbar-inner {
+    flex-wrap: nowrap;
   }
-  .place {
-    text-align: left;
+  .brand {
     min-width: 0;
+  }
+  .brand > div {
+    min-width: 0;
+  }
+  .topbar-side {
+    width: auto;
+    flex: none;
   }
   .lang-toggle {
     flex: none;
   }
   .lang-toggle button {
-    padding: 8px 6px;
+    min-height: 48px;
+    padding: 8px 10px;
   }
   .hero .field-art {
     display: none;

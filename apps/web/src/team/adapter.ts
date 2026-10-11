@@ -268,7 +268,7 @@ export function buildTeam(home: Home | undefined, lang: Lang): TeammateView[] {
       lang,
       `₹ ${crop} mandi price and MSP are on the team strip`,
       `₹ ${crop} का मंडी भाव और एमएसपी टीम की पट्टी पर`,
-      `₹ ${crop}चा मंडईभाव आणि MSP टीमच्या पट्ट्यावर`,
+      `₹ ${crop}चा मंडईभाव आणि एमएसपी टीमच्या पट्ट्यावर`,
     ),
   };
 
@@ -609,7 +609,7 @@ export function cardFromHome(home: Home, lang: Lang): FarmerCard {
     agent: "sakha",
     headline: action,
     do: tasks.length
-      ? tasks.map((task) => plainSentence(task.title, action))
+      ? tasks.map((task) => shownLine(plainSentence(task.title, action), lang))
       : [action],
     why,
     cost_inr: revision?.cost_inr,

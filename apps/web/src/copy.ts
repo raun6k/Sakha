@@ -633,6 +633,11 @@ const sourceNames: Record<string, Record<Lang, string>> = {
   W02: { en: "IMD weather", hi: "आईएमडी मौसम", mr: "आयएमडी हवामान" },
   W03: { en: "Rainfall record", hi: "बारिश का रिकॉर्ड", mr: "पावसाची नोंद" },
   W04: { en: "Rain forecast", hi: "बारिश का पूर्वानुमान", mr: "पावसाचा अंदाज" },
+  W05: {
+    en: "Open-Meteo forecast",
+    hi: "Open-Meteo पूर्वानुमान",
+    mr: "Open-Meteo अंदाज",
+  },
   C01: {
     en: "Ocean climate office",
     hi: "समुद्री जलवायु कार्यालय",

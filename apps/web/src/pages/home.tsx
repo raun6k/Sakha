@@ -108,9 +108,7 @@ export function HomePage() {
         </span>
         <span>
           {t(lang, "askSakha")}
-          <small>
-            {lang === "en" ? t(lang, "askSakhaHindi") : "Ask Sakha"}
-          </small>
+          {lang === "en" ? <small>{t(lang, "askSakhaHindi")}</small> : null}
         </span>
       </Link>
       <AnswerCard card={advice} />

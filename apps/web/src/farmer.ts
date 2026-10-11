@@ -24,10 +24,14 @@ export function shownLine(text: string, lang: Lang) {
   match = text.match(
     /^Cut between (.+) while the forecast shows ([\d.]+) mm of rain\.$/,
   );
-  if (match)
+  if (match) {
+    const when = match[1]
+      .replace(/\band\b/g, hi ? "से" : "ते")
+      .replace(/\bOct\b/g, hi ? "अक्टूबर" : "ऑक्टोबर");
     return hi
-      ? `${match[1]} के बीच काटें। पूर्वानुमान में ${match[2]} मिमी बारिश है।`
-      : `${match[1]} दरम्यान कापा. अंदाजात ${match[2]} मिमी पाऊस आहे.`;
+      ? `${when} के बीच काटें। पूर्वानुमान में ${match[2]} मिमी बारिश है।`
+      : `${when} दरम्यान कापा. अंदाजात ${match[2]} मिमी पाऊस आहे.`;
+  }
   match = text.match(
     /^Aim for ₹([\d,]+) per quintal, not the ₹([\d,]+) minimum\. The quote is cached (.+)\.$/,
   );
@@ -99,6 +103,13 @@ export function situationLabel(value: string, lang: Lang) {
   return undefined;
 }
 
+function namedCrop(value: string, lang: Lang) {
+  if (lang === "en") return value;
+  if (/^soybeans?$/i.test(value)) return "सोयाबीन";
+  if (/^cotton$/i.test(value)) return lang === "hi" ? "कपास" : "कापूस";
+  return value;
+}
+
 function scrub(text: string) {
   return text
     .replace(/,?\s*reported by demo farmer\.?/gi, "")
@@ -125,7 +136,7 @@ export function factText(value: Fact["value"] | undefined, lang: Lang): string {
   if (typeof value === "string") {
     const labeled = situationLabel(value, lang);
     if (labeled) return labeled;
-    const cleaned = scrub(value);
+    const cleaned = namedCrop(scrub(value), lang);
     return cleaned || t(lang, "notAdded");
   }
   if (typeof value === "boolean") return value ? "Yes" : "No";
@@ -143,7 +154,7 @@ export function factText(value: Fact["value"] | undefined, lang: Lang): string {
     case "qualitative": {
       const labeled = situationLabel(value.text, lang);
       if (labeled) return labeled;
-      const cleaned = scrub(value.text);
+      const cleaned = namedCrop(scrub(value.text), lang);
       return cleaned || t(lang, "notAdded");
     }
     case "unknown":
@@ -336,6 +347,7 @@ export function formatUpdated(iso: string | undefined, lang: Lang) {
     month: "short",
     hour: "numeric",
     minute: "2-digit",
+    hourCycle: lang === "en" ? "h12" : "h23",
     timeZone: "Asia/Kolkata",
   });
 }
