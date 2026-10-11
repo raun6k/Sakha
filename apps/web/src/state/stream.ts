@@ -3,6 +3,7 @@ export interface StreamState {
   cursors: Set<string>;
   sequences: Record<string, number>;
   partial: Record<string, string>;
+  partialMessageIds: Record<string, string>;
   messages: Message[];
   progress: Record<string, string>;
   resync: boolean;
@@ -11,6 +12,7 @@ export const emptyStream = (): StreamState => ({
   cursors: new Set(),
   sequences: {},
   partial: {},
+  partialMessageIds: {},
   messages: [],
   progress: {},
   resync: false,
@@ -22,6 +24,7 @@ export function reconcileEvent(state: StreamState, event: Event): StreamState {
     cursors: new Set(state.cursors).add(event.cursor),
     sequences: { ...state.sequences },
     partial: { ...state.partial },
+    partialMessageIds: { ...state.partialMessageIds },
     progress: { ...state.progress },
   };
   if (next.cursors.size > 3000)
@@ -32,6 +35,7 @@ export function reconcileEvent(state: StreamState, event: Event): StreamState {
     if (sequence > (next.sequences[id] ?? -1)) {
       next.sequences[id] = sequence;
       next.partial[id] = (next.partial[id] ?? "") + event.payload.text;
+      if (event.record_id) next.partialMessageIds[id] = event.record_id;
     }
   }
   if (event.type === "message_final" && event.payload.message) {
@@ -47,6 +51,7 @@ export function reconcileEvent(state: StreamState, event: Event): StreamState {
   if (event.type === "resync_required") {
     next.resync = true;
     next.partial = {};
+    next.partialMessageIds = {};
     next.sequences = {};
   }
   if (

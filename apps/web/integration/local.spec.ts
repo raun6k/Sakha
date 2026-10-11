@@ -5,6 +5,7 @@ import { expect, test } from "@playwright/test";
 import * as c from "@sakha/contracts";
 import type { Runtime } from "../../../packages/core/src/index";
 import { createApp } from "../../server/src/app";
+import { initializeDemo } from "../../server/src/demo";
 
 // Real HTTP, Cedar, scheduler and SQLite; only the model is a deterministic double.
 const runtime: Runtime = {
@@ -30,11 +31,11 @@ const runtime: Runtime = {
 let directory: string;
 let services: ReturnType<typeof createApp>;
 const origin = "http://127.0.0.1:4398";
-async function start() {
+async function start(selectedRuntime: Runtime = runtime) {
   services = createApp({
     databasePath: resolve(directory, "test.sqlite"),
     origin,
-    runtime,
+    runtime: selectedRuntime,
     startScheduler: true,
     webDirectory: resolve("apps/web/dist"),
   });
@@ -59,7 +60,9 @@ async function setup(page: import("@playwright/test").Page) {
   await page.getByRole("button", { name: "Skip this step" }).click();
   await page.getByRole("button", { name: "Open my Command Center" }).click();
   await expect(
-    page.getByRole("heading", { name: /Welcome back/ }),
+    page.getByRole("heading", {
+      name: /Good morning|Good afternoon|Good evening/,
+    }),
   ).toBeVisible();
   return c.Farm.parse(
     services.store.list("farm", services.store.farms()[0] ?? "")[0],
@@ -222,6 +225,9 @@ test("mobile specialists, local photo lifecycle, alert acknowledgement and full-
     expect(c.Role.parse((await response.json()).data).key).toBe(roleKey);
   }
   await page.goto(`${origin}/agents/crop_care`);
+  await page
+    .getByText("Explore specialist tools and scenarios", { exact: true })
+    .click();
   await page.getByLabel("Photo (PNG, JPEG or WebP, up to 8 MB)").setInputFiles({
     name: "synthetic-one-pixel.png",
     mimeType: "image/png",
@@ -301,4 +307,48 @@ test("mobile specialists, local photo lifecycle, alert acknowledgement and full-
   ).toBeVisible();
   expect(services.store.get("farm", farm.id, farm.id)).toBeUndefined();
   expect(services.store.list("attachment", farm.id)).toHaveLength(0);
+});
+
+test("thinking renders no empty agent bubble and first text becomes one canonical message", async ({
+  page,
+}) => {
+  let releaseText: () => void = () => {};
+  let releaseFinal: () => void = () => {};
+  const textGate = new Promise<void>((resolve) => {
+    releaseText = resolve;
+  });
+  const finalGate = new Promise<void>((resolve) => {
+    releaseFinal = resolve;
+  });
+  await services.app.close();
+  await start({
+    ...runtime,
+    startTurn: async (turn) => {
+      await turn.beforeSend();
+      await textGate;
+      await turn.onText("First model text");
+      await finalGate;
+      return { text: "First model text" };
+    },
+  });
+  initializeDemo(services);
+  await page.goto(`${origin}/ask`);
+  await page.getByLabel("Ask Chief of Staff").fill("What should I review?");
+  await page.getByRole("button", { name: "Send question" }).click();
+  await expect(
+    page.getByText("Chief of Staff is thinking…", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".message.agent, .message.partial")).toHaveCount(0);
+  releaseText();
+  await expect(
+    page.getByText("First model text", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".message.agent, .message.partial")).toHaveCount(1);
+  releaseFinal();
+  await expect(page.locator(".message.agent")).toHaveCount(1);
+  await page.reload();
+  await expect(page.locator(".message.agent, .message.partial")).toHaveCount(1);
+  await expect(
+    page.getByText("First model text", { exact: true }),
+  ).toBeVisible();
 });

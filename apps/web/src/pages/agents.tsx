@@ -604,7 +604,10 @@ export function ConversationView({ role }: { role: Role }) {
                   </small>
                 </header>
                 <Markdown remarkPlugins={[remarkGfm]} skipHtml>
-                  {message.text}
+                  {message.id === stream.partialMessageIds[runId] &&
+                  (stream.partial[runId]?.length ?? 0) > message.text.length
+                    ? stream.partial[runId]
+                    : message.text}
                 </Markdown>
                 <EvidenceLinks evidence={message.context.evidence} />
                 {message.status !== "final" ? (
@@ -620,14 +623,25 @@ export function ConversationView({ role }: { role: Role }) {
             </p>
           </Card>
         )}
-        {runId && stream.partial[runId]?.trim() ? (
+        {runId &&
+        stream.partial[runId]?.trim() &&
+        !messages.data?.items.some(
+          (m) => m.id === stream.partialMessageIds[runId] && m.text.trim(),
+        ) ? (
           <div className="message partial" aria-live="polite">
             <p>{stream.partial[runId]}</p>
             <Badge>Response in progress</Badge>
           </div>
         ) : null}
       </div>
-      {active && !stream.partial[runId]?.trim() ? (
+      {active &&
+      !stream.partial[runId]?.trim() &&
+      !messages.data?.items.some(
+        (m) =>
+          m.status === "partial" &&
+          m.text.trim() &&
+          m.created_at >= (run.data?.created_at ?? ""),
+      ) ? (
         <div className="thinking-indicator" role="status">
           <MessageCircle size={18} />
           {run.data?.state === "waiting_clarification"

@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   assertSourceUrl,
   containingCell,
+  latestRainfallIssue,
   parsePslMonthly,
   parseRoni,
+  publishedRainfallMonths,
 } from "./index.js";
 
 describe("attributable source normalization", () => {
@@ -73,4 +75,38 @@ describe("attributable source normalization", () => {
         .hostname,
     ).toBe("data.chc.ucsb.edu");
   });
+});
+
+it("selects the last published rainfall months instead of an unpublished previous month", () => {
+  const html =
+    '<a href="chirps-v3.0.2026.07.cog">July</a><a href="chirps-v3.0.2026.08.cog">August</a><a href="chirps-v3.0.2026.12.cog">Future</a>';
+  expect(
+    publishedRainfallMonths(html, new Date("2026-10-11"), 12).map((d) =>
+      d.toISOString(),
+    ),
+  ).toEqual(["2026-07-01T00:00:00.000Z", "2026-08-01T00:00:00.000Z"]);
+});
+it("uses an actually published recent GEFS issue and rejects stale/future discovery", () => {
+  expect(
+    latestRainfallIssue(
+      '<a href="10/">10</a><a href="12/">12</a>',
+      new Date("2026-10-11"),
+    ).toISOString(),
+  ).toBe("2026-10-10T00:00:00.000Z");
+  expect(() =>
+    latestRainfallIssue('<a href="01/">01</a>', new Date("2026-10-11")),
+  ).toThrow("three-day");
+});
+
+it("finds yesterday's issue across a month boundary without accepting nonexistent days", () => {
+  expect(
+    latestRainfallIssue(
+      '<a href="30/">30</a>',
+      new Date("2026-10-01"),
+      new Date("2026-09-01"),
+    ).toISOString(),
+  ).toBe("2026-09-30T00:00:00.000Z");
+  expect(() =>
+    latestRainfallIssue('<a href="00/">00</a>', new Date("2026-10-01")),
+  ).toThrow("three-day");
 });

@@ -836,6 +836,65 @@ export function createDataServices(
     },
   };
 }
+/** Resolve published files rather than assuming upstream has published today's issue. */
+export function publishedRainfallMonths(
+  html: string,
+  current: Date,
+  count: number,
+) {
+  const months = [
+    ...new Set(
+      [...html.matchAll(/href="(chirps-v3\.0\.(\d{4})\.(\d{2})\.cog)"/g)].map(
+        (m) => `${m[2]}-${m[3]}-01T00:00:00.000Z`,
+      ),
+    ),
+  ]
+    .filter(
+      (value) =>
+        Number.isFinite(Date.parse(value)) &&
+        Date.parse(value) <= current.getTime(),
+    )
+    .sort();
+  if (!months.length)
+    throw new DomainError(
+      "unavailable",
+      "No published monthly CHIRPS files found",
+    );
+  return months.slice(-count).map((value) => new Date(value));
+}
+export function latestRainfallIssue(
+  html: string,
+  current: Date,
+  monthAnchor: Date = current,
+) {
+  const dates = [...html.matchAll(/href="(\d{2})\/"/g)]
+    .map((m) => ({
+      day: Number(m[1]),
+      date: new Date(
+        Date.UTC(
+          monthAnchor.getUTCFullYear(),
+          monthAnchor.getUTCMonth(),
+          Number(m[1]),
+        ),
+      ),
+    }))
+    .filter(
+      ({ day, date }) =>
+        day >= 1 &&
+        date.getUTCMonth() === monthAnchor.getUTCMonth() &&
+        date.getTime() <= current.getTime() &&
+        current.getTime() - date.getTime() < 3 * 86400000,
+    )
+    .map(({ date }) => date)
+    .sort((a, b) => a.getTime() - b.getTime());
+  const latest = dates.at(-1);
+  if (!latest)
+    throw new DomainError(
+      "unavailable",
+      "No CHIRPS-GEFS issue published within the three-day discovery window",
+    );
+  return latest;
+}
 export async function refreshCoreEvidence(
   services: ReturnType<typeof createDataServices>,
   farmId: string,
@@ -942,6 +1001,51 @@ export async function refreshCoreEvidence(
         "validation",
         "Requested rainfall range exceeds supported processing bound",
       );
+    let publishedMonths: Date[] | undefined;
+    let forecastIssue = current;
+    try {
+      if (monthly) {
+        const index = await boundedFetch(
+          "https://data.chc.ucsb.edu/products/CHIRPS/v3.0/monthly/global/cogs/",
+        );
+        publishedMonths = publishedRainfallMonths(
+          new TextDecoder().decode(index.data),
+          current,
+          count,
+        );
+      } else if (source === "W04") {
+        let found = false;
+        let failure: unknown;
+        for (const anchor of [
+          current,
+          new Date(
+            Date.UTC(current.getUTCFullYear(), current.getUTCMonth() - 1, 1),
+          ),
+        ]) {
+          try {
+            const index = await boundedFetch(
+              `https://data.chc.ucsb.edu/products/CHIRPS-GEFS/v3/daily/global/${anchor.getUTCFullYear()}/${String(anchor.getUTCMonth() + 1).padStart(2, "0")}/`,
+            );
+            forecastIssue = latestRainfallIssue(
+              new TextDecoder().decode(index.data),
+              current,
+              anchor,
+            );
+            found = true;
+            break;
+          } catch (error) {
+            failure = error;
+          }
+        }
+        if (!found) throw failure;
+      }
+    } catch (error) {
+      const reason =
+        error instanceof Error ? error.message : "Publication discovery failed";
+      services.markSourceFailure(source, reason);
+      results.push({ source, status: "unavailable", reason });
+      continue;
+    }
     const points: c.Series["points"] = [];
     const hashes: string[] = [];
     let grid: z.infer<typeof c.GridMetadata> | undefined;
@@ -950,29 +1054,26 @@ export async function refreshCoreEvidence(
     let failures = 0;
     let preliminary = 0;
     let processedBytes = 0;
-    for (let index = 0; index < count; index++) {
-      const date = monthly
-        ? new Date(
-            Date.UTC(
-              current.getUTCFullYear(),
-              current.getUTCMonth() - count + index,
-              1,
-            ),
-          )
-        : new Date(
-            Date.UTC(
-              current.getUTCFullYear(),
-              current.getUTCMonth(),
-              current.getUTCDate() +
-                (source === "W03" ? -count + 1 + index : index),
-            ),
-          );
+    for (let index = 0; index < (publishedMonths?.length ?? count); index++) {
+      const date =
+        publishedMonths?.[index] ??
+        new Date(
+          Date.UTC(
+            current.getUTCFullYear(),
+            current.getUTCMonth(),
+            current.getUTCDate() +
+              (source === "W03" ? -count + 1 + index : index),
+          ),
+        );
       const year = date.getUTCFullYear();
       const month = String(date.getUTCMonth() + 1).padStart(2, "0");
       const day = String(date.getUTCDate()).padStart(2, "0");
-      const issueYear = current.getUTCFullYear();
-      const issueMonth = String(current.getUTCMonth() + 1).padStart(2, "0");
-      const issueDay = String(current.getUTCDate()).padStart(2, "0");
+      const issueYear = forecastIssue.getUTCFullYear();
+      const issueMonth = String(forecastIssue.getUTCMonth() + 1).padStart(
+        2,
+        "0",
+      );
+      const issueDay = String(forecastIssue.getUTCDate()).padStart(2, "0");
       let url = monthly
         ? `https://data.chc.ucsb.edu/products/CHIRPS/v3.0/monthly/global/cogs/chirps-v3.0.${year}.${month}.cog`
         : source === "W03"
@@ -1065,7 +1166,10 @@ export async function refreshCoreEvidence(
             source === "W03" && !monthly
               ? `${preliminary} preliminary daily samples; ${failures} unpublished/failed daily samples. Preliminary estimates are replaced by final when available.`
               : undefined,
-          valid_until: source === "W04" ? validUntil : undefined,
+          valid_until:
+            source === "W04"
+              ? new Date(Date.parse(last) + 86400000).toISOString()
+              : undefined,
         },
         completeness:
           failures || points.some((p) => p.value === null)
@@ -1087,21 +1191,24 @@ export async function refreshCoreEvidence(
             ? monthly
               ? "Satellite/station-derived gridded estimate; not a rain gauge measurement. Final monthly publication may lag. Missing months remain gaps."
               : `Daily sat product disaggregates CHIRPS pentad totals using IMERG Late V07 (native0.1° bilinearly resampled to0.05°); not station-day rain measurements and not a uniform all-station 24h window. ${preliminary} preliminary samples retained with replacement by final; ${failures} missing days remain gaps. Failures: ${failureDetails.join("; ")}. Data files: ${urls.join(" ")}`
-            : `Forecast issued ${current.toISOString().slice(0, 10)}, bias-corrected ensemble mean; not ensemble percentiles and not a guarantee. Data files: ${urls.join(" ")}`,
+            : `Forecast issued ${forecastIssue.toISOString().slice(0, 10)}, bias-corrected ensemble mean; not ensemble percentiles and not a guarantee. Data files: ${urls.join(" ")}`,
         url: urls[0],
         issued_at:
           source === "W04"
             ? new Date(
                 Date.UTC(
-                  current.getUTCFullYear(),
-                  current.getUTCMonth(),
-                  current.getUTCDate(),
+                  forecastIssue.getUTCFullYear(),
+                  forecastIssue.getUTCMonth(),
+                  forecastIssue.getUTCDate(),
                 ),
               ).toISOString()
             : undefined,
         retrieved_at: retrieved,
         valid_from: first,
-        valid_until: source === "W04" ? last : undefined,
+        valid_until:
+          source === "W04"
+            ? new Date(Date.parse(last) + 86400000).toISOString()
+            : undefined,
         geography,
         resolution: "0.05 degree",
         grid,
