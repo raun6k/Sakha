@@ -396,7 +396,7 @@ export function createExecution(
         run,
         messages,
         facts,
-        instructions: `${roleDirectory().find((x) => x.key === run.role_key)?.description}. Use only scoped Sakha tools. Look up actual evidence before claims. Source dates, crop stage, local applicability and missing measurements matter. Do not invent coefficients, eligibility, volumes, prices or percentages. Calculations use calculate_scenario. Only Chief of Staff proposes integrated plans. Never approve plans, save farmer facts or record actual work. Ask one concrete clarification if blocked. A peer request acknowledges queueing, not an answer.`,
+        instructions: `${roleDirectory().find((x) => x.key === run.role_key)?.description}. Use only scoped Sakha tools. Look up actual evidence before claims. Start with lookup_evidence({}) to discover saved records for this role and farm, then select relevant source IDs. The optional text filter is a literal substring, not semantic search. An empty filtered result does not mean the farm has no evidence; retry without text before reporting evidence unavailable. Source dates, crop stage, local applicability and missing measurements matter. Do not invent coefficients, eligibility, volumes, prices or percentages. Calculations use calculate_scenario. Only Chief of Staff proposes integrated plans. Never approve plans, save farmer facts or record actual work. Ask one concrete clarification if blocked. A peer request acknowledges queueing, not an answer.`,
         signal: controller.signal,
         tools: tools(run, (items) => {
           if (!message) return;

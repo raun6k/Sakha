@@ -12,7 +12,10 @@ for (const [name, schema] of Object.entries(gatewaySchemas))
   server.registerTool(
     name,
     {
-      description: `Run-bound Sakha ${name}; principal and farm cannot be supplied`,
+      description:
+        name === "lookup_evidence"
+          ? "List saved evidence authorized for this run. Use {} to discover available records; source_id is an exact catalog ID and text is a literal substring filter. Retry without text before declaring evidence missing. Principal and farm cannot be supplied."
+          : `Run-bound Sakha ${name}; principal and farm cannot be supplied`,
       inputSchema: schema.shape,
       annotations: {
         readOnlyHint: [

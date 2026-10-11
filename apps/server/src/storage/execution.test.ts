@@ -217,7 +217,12 @@ it("persists exact consulted evidence snapshots once in the canonical response",
   const s = setup({
     getCapabilities: async () => ready,
     startTurn: async (turn) => {
-      await turn.tools.lookupEvidence({ source_id: "C01" });
+      expect(
+        await turn.tools.lookupEvidence({
+          text: "unmatched natural language query",
+        }),
+      ).toHaveLength(0);
+      expect(await turn.tools.lookupEvidence({})).toHaveLength(1);
       await turn.tools.lookupEvidence({ source_id: "C01" });
       return { text: "Synthetic evidence-grounded answer" };
     },
