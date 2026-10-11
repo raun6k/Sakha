@@ -113,13 +113,23 @@ export function latestFact(facts: Fact[], key: string) {
   return facts.filter((fact) => fact.key === key).at(-1)?.value;
 }
 
-export function pickRainSeries(series: Series[]) {
-  return series.find(
-    (item) =>
-      item.source_id === "W04" &&
-      item.kind === "forecast" &&
-      item.points.some((point) => typeof point.value === "number"),
+function isRainForecast(item: Series) {
+  return (
+    item.kind === "forecast" &&
+    /rain/i.test(`${item.variable} ${item.unit}`) &&
+    item.points.some((point) => typeof point.value === "number")
   );
+}
+
+/** Prefer the adapter's next-seven-day forecast, then the older outlook. */
+export function pickRainSeries(series: Series[]) {
+  const preferred =
+    series.find((item) => item.source_id === "W05" && isRainForecast(item)) ??
+    series.find((item) => item.source_id === "W04" && isRainForecast(item));
+  if (!preferred) return undefined;
+  if (preferred.source_id === "W05" && preferred.points.length > 7)
+    return { ...preferred, points: preferred.points.slice(0, 7) };
+  return preferred;
 }
 
 export function rainTotal(series?: Series) {

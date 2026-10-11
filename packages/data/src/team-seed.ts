@@ -243,7 +243,7 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
     fetched_at: cache.forecast.fetched_at,
   };
   const actions = [
-    `Cut the ${brief.soybean_ha} ha soybean on ${pretty(plusDays(today, 1))}–${pretty(plusDays(today, 5))}.`,
+    `Cut the ${brief.soybean_ha} ha soybean on ${pretty(plusDays(today, 1))} to ${pretty(plusDays(today, 5))}.`,
     `Sell at ${brief.market} aiming for ₹${rupee(brief.modal_inr)} per quintal, not the ₹${rupee(brief.min_inr)} minimum (${cachedLabel}).`,
     `Give the soybean 0 mm and keep the borewell for ${brief.cotton_ha} ha cotton.`,
   ];
@@ -283,7 +283,7 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
     agent: "sakha",
     headline: "I only help with your farm",
     do: ["Ask about this week's rain, water, the soybean, or the mandi price."],
-    why: "I only help with your farm — ask me about weather, water, crops or money.",
+    why: "I only help with your farm. Ask me about weather, water, crops or money.",
     risk: "low",
     confidence: "high",
     sources: [forecastSource],

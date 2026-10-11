@@ -25,6 +25,25 @@ function rupee(value: number) {
   );
 }
 
+function prettyDate(iso: string) {
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  const [year, month, day] = iso.slice(0, 10).split("-");
+  return `${Number(day)} ${months[Number(month) - 1]} ${year}`;
+}
+
 /** Seed only an empty installation. Numbers in the plan come from the adapter cache. */
 export function initializeDemo(services: Services, cache?: DemoCache) {
   const { store, farm, domain } = services;
@@ -194,7 +213,7 @@ export function initializeDemo(services: Services, cache?: DemoCache) {
             ),
             task(
               `Sell at ${brief.market}`,
-              `Aim for ₹${rupee(brief.modal_inr)} per quintal, not the ₹${rupee(brief.min_inr)} minimum. The quote is cached ${brief.price_date}.`,
+              `Aim for ₹${rupee(brief.modal_inr)} per quintal, not the ₹${rupee(brief.min_inr)} minimum. The quote is cached ${prettyDate(brief.price_date)}.`,
               "2026-10-13T09:00:00+05:30",
             ),
             task(

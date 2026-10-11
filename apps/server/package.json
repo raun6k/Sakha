@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --env-file-if-exists=../../.env --import tsx --watch src/index.ts"
+    "dev": "sh -c 'if [ -f ../../.env ]; then exec node --env-file=../../.env --import tsx --watch src/index.ts; else exec node --import tsx --watch src/index.ts; fi'"
   },
   "dependencies": {
     "@sakha/contracts": "workspace:*",

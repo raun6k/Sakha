@@ -177,6 +177,8 @@ export function createFixtureService(
       title: "Prepare your recorded farm context",
       summary:
         "Synthetic demonstration proposal. Inspect the crop and record what you actually observe.",
+      cost_inr: 100,
+      benefit_inr: 200,
       tasks,
       findings: [],
       evidence: [],

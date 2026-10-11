@@ -13,7 +13,7 @@ export function AnswerCard({ card }: { card: FarmerCard }) {
         ? t(lang, "riskMedium")
         : card.risk === "low"
           ? t(lang, "riskLow")
-          : t(lang, "notKnown");
+          : undefined;
   const confidence =
     card.confidence === "high"
       ? t(lang, "riskHigh")
@@ -21,7 +21,13 @@ export function AnswerCard({ card }: { card: FarmerCard }) {
         ? t(lang, "riskMedium")
         : card.confidence === "low"
           ? t(lang, "riskLow")
-          : t(lang, "notKnown");
+          : undefined;
+  const costKnown =
+    card.cost_inr !== undefined ||
+    (card.cost_inr_low !== undefined && card.cost_inr_high !== undefined);
+  const benefitKnown =
+    card.benefit_inr !== undefined ||
+    (card.benefit_inr_low !== undefined && card.benefit_inr_high !== undefined);
   return (
     <article className={`answer-card agent-${card.agent}`}>
       <header className="answer-head">
@@ -41,36 +47,44 @@ export function AnswerCard({ card }: { card: FarmerCard }) {
         <span className="answer-label">{t(lang, "why")}</span> {card.why}
       </p>
       <dl className="reco">
-        <div>
-          <dt>{t(lang, "cost")}</dt>
-          <dd>
-            {rupeeText(
-              card.cost_inr,
-              card.cost_inr_low,
-              card.cost_inr_high,
-              lang,
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt>{t(lang, "benefit")}</dt>
-          <dd>
-            {rupeeText(
-              card.benefit_inr,
-              card.benefit_inr_low,
-              card.benefit_inr_high,
-              lang,
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt>{t(lang, "riskLevel")}</dt>
-          <dd>{risk}</dd>
-        </div>
-        <div>
-          <dt>{t(lang, "confidence")}</dt>
-          <dd>{confidence}</dd>
-        </div>
+        {costKnown ? (
+          <div>
+            <dt>{t(lang, "cost")}</dt>
+            <dd>
+              {rupeeText(
+                card.cost_inr,
+                card.cost_inr_low,
+                card.cost_inr_high,
+                lang,
+              )}
+            </dd>
+          </div>
+        ) : null}
+        {benefitKnown ? (
+          <div>
+            <dt>{t(lang, "benefit")}</dt>
+            <dd>
+              {rupeeText(
+                card.benefit_inr,
+                card.benefit_inr_low,
+                card.benefit_inr_high,
+                lang,
+              )}
+            </dd>
+          </div>
+        ) : null}
+        {risk ? (
+          <div>
+            <dt>{t(lang, "riskLevel")}</dt>
+            <dd>{risk}</dd>
+          </div>
+        ) : null}
+        {confidence ? (
+          <div>
+            <dt>{t(lang, "confidence")}</dt>
+            <dd>{confidence}</dd>
+          </div>
+        ) : null}
       </dl>
       <ul className="source-list">
         {card.sources.map((source) => (
