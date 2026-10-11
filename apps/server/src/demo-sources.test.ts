@@ -48,7 +48,7 @@ it("imports dated official snapshots offline once with complete rainfall coverag
     evidence.length,
   );
 });
-it("keeps Nagpur as the only farm place and refuses another stored point", () => {
+it("keeps the requested farm place and refuses a snapshot for another point", () => {
   const { services } = context();
   const created = c.Farm.parse(
     services.farm.execute(
@@ -66,7 +66,11 @@ it("keeps Nagpur as the only farm place and refuses another stored point", () =>
       {},
     ),
   );
-  expect(created.location).toMatchObject(c.nagpurPlace);
+  expect(created.location).toMatchObject({
+    district: "Pune",
+    latitude: 18.52,
+    longitude: 73.85,
+  });
   const other = c.Farm.parse({
     ...services.farm.makeBase("other-point"),
     id: "other-point",
@@ -107,4 +111,36 @@ it("rejects tampered source bytes before storing any evidence", () => {
     importDemoSources(services, farm.id, pathToFileURL(`${directory}/`)),
   ).toThrow("checksum mismatch");
   expect(services.store.list("evidence", farm.id)).toHaveLength(0);
+});
+it("keeps a Pune farm on the next startup", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "sakha-pune-"));
+  directories.push(directory);
+  const databasePath = join(directory, "sakha.sqlite");
+  const first = createApp({ databasePath });
+  apps.push(first);
+  const created = c.Farm.parse(
+    first.farm.execute(
+      "createFarm",
+      {
+        name: "Pune farm",
+        location: {
+          country: "India",
+          state: "Maharashtra",
+          district: "Pune",
+          latitude: 18.52,
+          longitude: 73.85,
+        },
+      },
+      {},
+    ),
+  );
+  expect(created.location?.latitude).toBe(18.52);
+  await first.app.close();
+  apps.splice(apps.indexOf(first), 1);
+  const second = createApp({ databasePath });
+  apps.push(second);
+  const loaded = second.farm.assertFarm(created.id);
+  expect(loaded.location?.district).toBe("Pune");
+  expect(loaded.location?.latitude).toBe(18.52);
+  expect(loaded.location?.longitude).toBe(73.85);
 });

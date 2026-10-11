@@ -10,6 +10,9 @@ export const Id = z.string().min(1).max(128);
 export const Timestamp = z.iso.datetime({ offset: true });
 export const RoleKey = z.enum(["sakha", "megha", "jal", "kheti", "paisa"]);
 export type RoleKey = z.infer<typeof RoleKey>;
+/** The five farm-team ids. They are the stored role keys. */
+export const AgentId = RoleKey;
+export type AgentId = RoleKey;
 export const roles = RoleKey.options;
 export const Scope = z.object({ farm_id: Id, field_id: Id.optional() });
 export const Origin = z.enum([
@@ -209,8 +212,32 @@ export const TeamCard = z.object({
   consulted: z.array(RoleKey).optional(),
   reviewed: z.boolean().optional(),
   reviewed_by: z.literal("sakha").optional(),
+  forecast_days: z
+    .array(
+      z.object({
+        date: z.string(),
+        rain_mm: z.number().nullable(),
+        tmax: z.number().nullable(),
+        prob: z.number().nullable(),
+      }),
+    )
+    .optional(),
+  action: z.enum(["irrigate", "wait"]).optional(),
+  mm: z.number().optional(),
+  pump_hours: z.number().optional(),
+  prices: z
+    .array(
+      z.object({
+        mandi: z.string(),
+        modal_inr: z.number(),
+        date: z.string(),
+      }),
+    )
+    .optional(),
 });
 export type TeamCard = z.infer<typeof TeamCard>;
+export const Card = TeamCard;
+export type Card = TeamCard;
 export const RunState = z.enum([
   "queued",
   "running",
@@ -248,6 +275,10 @@ export const Message = RecordBase.extend({
     reviewed_by: z.literal("sakha").optional(),
     card: TeamCard.optional(),
   }),
+  team_id: AgentId.optional(),
+  reviewed_by: AgentId.optional(),
+  consulted: z.array(AgentId).optional(),
+  card: Card.optional(),
 });
 export const Conversation = RecordBase.extend({
   role_key: RoleKey,
@@ -525,6 +556,15 @@ export const Home = z.object({
   alerts: z.array(Alert),
   insights: Insights,
   capabilities: z.array(Capability),
+  team_status: z
+    .array(
+      z.object({
+        id: AgentId,
+        name: z.string(),
+        line: z.string(),
+      }),
+    )
+    .optional(),
 });
 export const Bootstrap = z.object({
   demo_profile: z.boolean().default(false),

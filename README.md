@@ -55,4 +55,6 @@ Exports are scoped local JSON downloads with an explicit private-data option and
 
 ## Reproducible presentation demo
 
-Run `./scripts/sakha build`, `./scripts/sakha-demo init`, then `./scripts/sakha-demo start`. Open http://127.0.0.1:4396. This seeds an isolated demo farm with illustrative farmer records and attributed source snapshots, using the real Codex agent pipeline. See [demo setup and reset instructions](demo/README.md). The legacy `?demo=1` mode remains a separate synthetic frontend test fixture.
+`pnpm seed:demo` loads the Kalmeshwar demo farm into `.local/demo/sakha.sqlite`: Kavita Meshram, soybean and cotton, one approved plan, and seeded replies for Sakha, Megha, Jal, Kheti and Paisa. Set `DATA_GOV_IN_API_KEY` if a live Agmarknet call should be attempted. See [demo setup and reset instructions](demo/README.md) and [adapter shapes](packages/data/README.md).
+
+The presentation server is still `./scripts/sakha build`, `./scripts/sakha-demo init`, then `./scripts/sakha-demo start` at http://127.0.0.1:4396. The legacy `?demo=1` mode remains a separate synthetic frontend test fixture.

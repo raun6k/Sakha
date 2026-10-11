@@ -135,8 +135,8 @@ export function importDemoSources(
       c.Finding.parse({
         ...services.farm.makeBase(farmId),
         role_key: "megha",
-        title: `RONI ${latest.value !== null && latest.value >= 0 ? "+" : ""}${latest.value} °C`,
-        summary: `Latest published relative Niño index, ${new Date(latest.time).toLocaleDateString("en-IN", { month: "short", year: "numeric", timeZone: "UTC" })}. A Pacific climate indicator, not a local rainfall prediction.`,
+        title: `Pacific index ${latest.value !== null && latest.value >= 0 ? "+" : ""}${latest.value} °C`,
+        summary: `Latest published second NOAA Pacific index, ${new Date(latest.time).toLocaleDateString("en-IN", { month: "short", year: "numeric", timeZone: "UTC" })}. A climate indicator, not a local rainfall prediction.`,
         evidence: [ref(evidenceFor(roni.evidence_id ?? ""))],
         assumptions: [],
         missing_inputs: [],

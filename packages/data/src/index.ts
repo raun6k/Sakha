@@ -22,6 +22,10 @@ const allowedHosts = new Set([
   "pmfby.gov.in",
   "pmfby.amnex.co.in",
   "www.pib.gov.in",
+  "api.open-meteo.com",
+  "archive-api.open-meteo.com",
+  "api.data.gov.in",
+  "power.larc.nasa.gov",
 ]);
 export function assertSourceUrl(value: string) {
   const url = new URL(value);
@@ -789,7 +793,19 @@ export function createDataServices(
       return c.Insights.parse({
         series: selected,
         capabilities: sources()
-          .filter((s) => ["C01", "W01", "W03", "W04"].includes(s.id))
+          .filter((s) =>
+            [
+              "C01",
+              "C08",
+              "W01",
+              "W03",
+              "W04",
+              "W05",
+              "W06",
+              "W07",
+              "M01",
+            ].includes(s.id),
+          )
           .map((s) => s.capability),
         missing_inputs: series.length
           ? []
@@ -1333,3 +1349,25 @@ export function importMarketQuote(
     );
   });
 }
+
+export type { AdapterResult, DemoCache, PreparedSeries } from "./adapters.js";
+export {
+  buildHarvestRecommendation,
+  DEMO_FARMER,
+  isIndianFarmLocation,
+  loadDemoCache,
+  parseAgmarknet,
+  parseOni,
+  parseOpenMeteoDaily,
+  parsePowerDaily,
+  refreshDemoCache,
+  selectMandiQuote,
+} from "./adapters.js";
+export type {
+  FindingDraft,
+  SeedMemory,
+  SeedStatus,
+  SeedThread,
+  TeamSeed,
+} from "./team-seed.js";
+export { buildTeamSeed, resolveTeamRole, TEAM } from "./team-seed.js";

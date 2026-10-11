@@ -139,7 +139,7 @@ export function createFarmServices(
             const farmId = id();
             const farm = c.Farm.parse({
               ...d,
-              location: c.nagpurPlace,
+              location: d.location ?? c.nagpurPlace,
               ...makeBase(farmId),
               id: farmId,
               setup_complete: false,
@@ -156,7 +156,7 @@ export function createFarmServices(
             const updated = c.Farm.parse({
               ...farm,
               ...d,
-              location: c.nagpurPlace,
+              location: d.location ?? farm.location,
               version: farm.version + 1,
               updated_at: now(),
             });

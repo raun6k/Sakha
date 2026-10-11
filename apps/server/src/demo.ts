@@ -1,18 +1,32 @@
 import * as c from "@sakha/contracts";
+import {
+  DEMO_FARMER,
+  type DemoCache,
+  loadDemoCache,
+  refreshDemoCache,
+} from "@sakha/data";
 import { DomainError } from "@sakha/farm";
+import { importAdapterCache } from "./adapter-import.js";
 import type { createApp } from "./app.js";
+import { importDemoSources } from "./demo-sources.js";
+import { persistTeamSeed } from "./team-persist.js";
 
 export const DEMO_ID = "sakha-public-demo.v1";
-export const DEMO_LOCATION = {
-  ...c.nagpurPlace,
-  village: "Public Nagpur demonstration point",
-};
+const SOWING = "2026-06-20";
 type Services = ReturnType<typeof createApp>;
+
 export function isDemo(store: Services["store"]) {
   return Boolean(store.get("demo_profile", DEMO_ID, "installation"));
 }
-/** Seed only an empty installation; all farmer information is deliberately illustrative. */
-export function initializeDemo(services: Services) {
+
+function rupee(value: number) {
+  return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(
+    value,
+  );
+}
+
+/** Seed only an empty installation. Numbers in the plan come from the adapter cache. */
+export function initializeDemo(services: Services, cache?: DemoCache) {
   const { store, farm, domain } = services;
   const marker = store.get("demo_profile", DEMO_ID, "installation");
   if (marker) {
@@ -34,22 +48,32 @@ export function initializeDemo(services: Services) {
       "permission_denied",
       "Demo initialization requires a separate empty database; existing farms are never overwritten",
     );
+  const data = cache ?? loadDemoCache();
+  const brief = data.brief;
+  const rec = data.recommendation;
   return store.transaction(() => {
     const profile = c.Farm.parse(
       farm.execute(
         "createFarm",
-        { name: "Sahaj Demo Farm", location: DEMO_LOCATION },
+        {
+          name: brief.farmer_name,
+          location: {
+            country: DEMO_FARMER.country,
+            state: brief.state,
+            district: brief.district,
+            village: brief.village,
+            latitude: DEMO_FARMER.latitude,
+            longitude: DEMO_FARMER.longitude,
+          },
+        },
         {},
       ),
     );
     const farmId = profile.id;
-    const now = new Date();
-    const time = (offset: number) =>
-      new Date(now.getTime() + offset * 86400000).toISOString();
     const provenance = {
       origin: "farmer_report" as const,
-      attribution: "Illustrative demo farmer (not an actual farmer report)",
-      effective_at: time(0),
+      attribution: `${brief.farmer_name}, ${brief.village} (demo profile, not a live survey)`,
+      effective_at: data.forecast.fetched_at,
       evidence: [],
     };
     const entries: {
@@ -60,53 +84,50 @@ export function initializeDemo(services: Services) {
       {
         category: "F01",
         key: "area",
-        value: { kind: "known", value: 2.4, unit: "ha" },
+        value: { kind: "known", value: brief.total_ha, unit: "ha" },
       },
       {
         category: "F01",
         key: "situation",
-        value: "Owner-operated family farm · Kharif harvest preparation",
+        value: `${brief.village}, ${brief.district} · soybean pods drying, cotton still in the field`,
       },
       { category: "F02", key: "current_crop", value: "Soybean" },
       {
         category: "F02",
-        key: "intended_crop",
-        value: "Chickpea after harvest; sowing decision still pending",
+        key: "companion_crop",
+        value: `Cotton on ${brief.cotton_ha} ha`,
       },
-      { category: "F02", key: "crop_stage", value: "Maturity · pods drying" },
+      { category: "F02", key: "crop_stage", value: "Pods drying" },
       {
         category: "F02",
         key: "crop_condition",
         value:
-          "Mostly dry pods; a small patch still green, reported by demo farmer",
+          "Mostly dry pods; a small green patch, reported by the farmer. Not a diagnosis.",
       },
-      {
-        category: "F03",
-        key: "water_source",
-        value: "Farm pond and stored tank water",
-      },
+      { category: "F03", key: "water_source", value: "Borewell" },
       {
         category: "F03",
         key: "water_availability",
-        value: { kind: "known", value: 150, unit: "m3" },
+        value: "Not measured",
       },
       {
         category: "F04",
         key: "resources",
-        value: "Shared tractor, tarpaulins, hand tools and two family workers",
+        value:
+          "Family harvest labour. Pump horsepower and the power tariff are not recorded.",
       },
       {
         category: "F04",
         key: "soil_type",
-        value: "Clay loam, demo farmer description; no laboratory result",
+        value: "Not laboratory tested",
       },
     ];
     farm.execute(
       "completeSetup",
       {
         expected_version: profile.version,
-        facts: entries.map((e) => ({
-          ...e,
+        facts: entries.map((entry) => ({
+          ...entry,
           farm_id: farmId,
           provenance,
           private: false,
@@ -118,7 +139,7 @@ export function initializeDemo(services: Services) {
       "createField",
       {
         name: "Soybean field",
-        area: { kind: "known", value: 1.8, unit: "ha" },
+        area: { kind: "known", value: brief.soybean_ha, unit: "ha" },
         crop: "Soybean",
       },
       { farmId },
@@ -126,9 +147,9 @@ export function initializeDemo(services: Services) {
     farm.execute(
       "createField",
       {
-        name: "Pigeonpea field",
-        area: { kind: "known", value: 0.6, unit: "ha" },
-        crop: "Pigeonpea",
+        name: "Cotton field",
+        area: { kind: "known", value: brief.cotton_ha, unit: "ha" },
+        crop: "Cotton",
       },
       { farmId },
     );
@@ -137,65 +158,55 @@ export function initializeDemo(services: Services) {
       {
         farm_id: farmId,
         purpose:
-          "Demo-only external processing of public illustrative farm records and conversation text",
-        fields: [
-          "conversation",
-          "area",
-          "situation",
-          "current_crop",
-          "intended_crop",
-          "crop_stage",
-          "crop_condition",
-          "water_source",
-          "water_availability",
-          "resources",
-          "soil_type",
-        ],
+          "Demo-only external processing of this seeded farm profile and its conversation text",
+        fields: entries.map((entry) => entry.key),
         roles: c.RoleKey.options,
         external_processing: true,
         storage: "persistent",
       },
       { farmId },
     );
-    const task = (title: string, description: string, due: number) => ({
+    const task = (title: string, description: string, due: string) => ({
       ...farm.makeBase(farmId),
       title,
       description,
-      role_key: "kheti" as const,
+      role_key: "sakha" as const,
       status: "proposed" as const,
-      due_at: time(due),
+      due_at: due,
       evidence: [],
     });
+    const cutFrom = "2026-10-12T09:00:00+05:30";
     const approved = c.PlanRevision.parse(
       domain.execute(
         "createPlanRevision",
         {
           farm_id: farmId,
-          title: "Harvest preparation",
-          summary:
-            "Demo farmer's approved preparation checklist. No automatic harvest, irrigation or spending is recorded by approval.",
+          title: rec.title,
+          summary: `${rec.action} Harvest labour ₹${rupee(rec.cost_inr)}. The modal-minus-minimum gap on ${rec.quintals} quintal is ₹${rupee(rec.benefit_inr)}, not a promised sale.`,
           tasks: [
             task(
-              "Inspect soybean pods",
-              "Walk both plots and record remaining green patches.",
-              0,
+              `Cut ${brief.soybean_ha} ha soybean`,
+              `Cut between 12 and 16 Oct 2026 while the forecast shows ${brief.forecast_rain_7d_mm} mm of rain.`,
+              cutFrom,
             ),
             task(
-              "Prepare tarpaulins and dry storage",
-              "Clean the storage area and check available tarpaulins before selecting a harvest date.",
-              1,
+              `Sell at ${brief.market}`,
+              `Aim for ₹${rupee(brief.modal_inr)} per quintal, not the ₹${rupee(brief.min_inr)} minimum. The quote is cached ${brief.price_date}.`,
+              "2026-10-13T09:00:00+05:30",
             ),
             task(
-              "Review harvest timing with Sakha",
-              "Compare the farmer's maturity report with current attributed weather guidance.",
-              2,
+              "Keep the borewell for cotton",
+              `Give the soybean 0 mm. About ${rupee(rec.borewell_held_m3)} m3 stays unpumped for the ${brief.cotton_ha} ha cotton.`,
+              "2026-10-12T09:00:00+05:30",
             ),
           ],
           findings: [],
           evidence: [],
           constraints: [],
           assumptions: [
-            "Illustrative farmer-selected checklist; not an agronomic prescription",
+            ...rec.assumptions,
+            `Soybean sown ${SOWING}, farmer report. Variety was not stated.`,
+            "Soil moisture, pump horsepower and the power tariff were not measured.",
           ],
           missing_inputs: [],
         },
@@ -208,7 +219,7 @@ export function initializeDemo(services: Services) {
         expected_version: approved.version,
         base_revision_id: null,
         decision: "approve",
-        reason: "Seeded demo farmer decision",
+        reason: "Seeded demo farmer accepted the harvest-and-sell plan",
       },
       { farmId, revisionId: approved.id },
     );
@@ -218,12 +229,14 @@ export function initializeDemo(services: Services) {
         farm_id: farmId,
         kind: "observation",
         description:
-          "Demo farmer walked the soybean field and recorded mostly dry pods with a remaining green patch.",
+          "Farmer walked the soybean and reported mostly dry pods, with one small green patch. Not a diagnosis.",
         confirmed: true,
         confirmed_by: "farmer",
-        effective_at: time(-1),
-        task_id: approved.tasks[0]?.id,
-        provenance: { ...provenance, effective_at: time(-1) },
+        effective_at: "2026-10-10T09:00:00+05:30",
+        provenance: {
+          ...provenance,
+          effective_at: "2026-10-10T09:00:00+05:30",
+        },
       },
       { farmId },
     );
@@ -233,47 +246,25 @@ export function initializeDemo(services: Services) {
         farm_id: farmId,
         kind: "other",
         description:
-          "Demo farmer cleaned the tool shed and counted the available tarpaulins.",
+          "Farmer reported no irrigation this week. Borewell volume was not measured.",
         confirmed: true,
         confirmed_by: "farmer",
-        effective_at: time(-2),
-        provenance: { ...provenance, effective_at: time(-2) },
-      },
-      { farmId },
-    );
-    domain.execute(
-      "createPlanRevision",
-      {
-        farm_id: farmId,
-        base_revision_id: approved.id,
-        title: "Review the remaining green patch",
-        summary:
-          "A separate demo proposal to inspect the green patch again. It has not replaced the approved checklist.",
-        tasks: [
-          task(
-            "Inspect the green patch again",
-            "Record pod dryness before changing the farmer's harvest checklist.",
-            2,
-          ),
-        ],
-        findings: [],
-        evidence: [],
-        constraints: [],
-        assumptions: ["Illustrative draft; farmer approval still required"],
-        missing_inputs: [],
+        effective_at: "2026-10-10T10:00:00+05:30",
+        provenance: {
+          ...provenance,
+          effective_at: "2026-10-10T10:00:00+05:30",
+        },
       },
       { farmId },
     );
     for (const reminder of [
       {
-        title: "Prepare dry storage",
-        summary:
-          "Demo farmer reminder: check the storage area and tarpaulins on your approved preparation checklist.",
+        title: "Dry week for the soybean cut",
+        summary: `Open-Meteo shows ${brief.forecast_rain_7d_mm} mm over the next 7 days. The approved plan is to cut ${brief.soybean_ha} ha and sell at the cached modal.`,
       },
       {
-        title: "Review your next crop choice",
-        summary:
-          "Demo farmer reminder: chickpea is an intention, not a completed sowing record. Discuss soil, inputs and current local guidance before committing.",
+        title: "Mandi quote is cached",
+        summary: `${brief.market} ${brief.market_note}`,
       },
     ]) {
       store.put(
@@ -285,11 +276,15 @@ export function initializeDemo(services: Services) {
           role_key: "sakha",
           status: "active",
           evidence: [],
-          issued_at: time(0),
-          freshness: { status: "fresh" },
+          issued_at: data.forecast.fetched_at,
+          freshness: {
+            status: "fresh",
+            retrieved_at: data.forecast.fetched_at,
+          },
         }),
       );
     }
+    persistTeamSeed(services, farmId, data);
     store.put("demo_profile", {
       ...farm.makeBase("installation"),
       id: DEMO_ID,
@@ -320,4 +315,24 @@ export function resetDemo(services: Services) {
     );
   });
   return initializeDemo(services);
+}
+
+/** One command for the named demo farm, its cache, and the team seed. */
+export async function seedDemo(
+  services: Services,
+  options: { live?: boolean } = {},
+) {
+  const cache =
+    options.live === false
+      ? loadDemoCache()
+      : await refreshDemoCache().catch(() => loadDemoCache());
+  const profile = initializeDemo(services, cache);
+  const location = profile.location;
+  const sources =
+    location?.latitude === c.nagpurPlace.latitude &&
+    location.longitude === c.nagpurPlace.longitude
+      ? importDemoSources(services, profile.id)
+      : { series: 0, documents: 0 };
+  const adapters = importAdapterCache(services, profile.id, cache);
+  return { profile, sources, adapters, cache };
 }

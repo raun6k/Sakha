@@ -1,18 +1,21 @@
 # Sakha reproducible demo
 
-This demo uses the normal local HTTP/SQLite/Cedar/Codex application. It seeds an isolated, explicitly labeled farm with invented farmer reports, fields, decisions, reminders and completed observations. It does not manufacture weather or climate observations.
+This demo uses the normal local HTTP/SQLite/Cedar application. It seeds one named farm, Kavita Meshram of Kalmeshwar in Nagpur district, with soybean on 1.6 ha and cotton on 0.8 ha, a borewell, and one approved harvest plan. Prices, rain and the Niño index come from the adapter cache. Farmer-reported items (yield, harvest labour, sowing date, the green patch) are labelled as her report.
 
 ```sh
+pnpm seed:demo
 ./scripts/sakha build
 ./scripts/sakha-demo init
 ./scripts/sakha-demo start
 ```
 
-Open http://127.0.0.1:4396. The launcher uses `.local/demo/sakha.sqlite`, separate from the normal OS application-data profile. Existing Codex authentication powers all nine agents using GPT-6 Luna; no API key is required. The installed Codex runtime and account access are required for real replies. The demo seed includes a grant for sending its public illustrative records/conversation to Codex; real farmer profiles require their own grants.
+`pnpm seed:demo` writes `.local/demo/sakha.sqlite` unless `SAKHA_DATABASE_PATH` is set. It tries a live refresh, then uses `packages/data/cache` if a source does not answer. `SAKHA_SEED_LIVE=0` skips the network. Running it again does not duplicate the farm, the conversations, or the imported series.
 
-Stop the demo backend before running `./scripts/sakha-demo reset`. Reset refuses normal unmarked databases and installations with additional farms. It discards changes made to this dedicated demo and restores the seed. `init` is idempotent. Files in `.local` are ignored; the seed code and attributed source snapshot are versioned.
+Open http://127.0.0.1:4396. The launcher uses `.local/demo/sakha.sqlite`, separate from the normal OS application-data profile. Existing Codex authentication powers the farm roles using GPT-6 Luna; no API key is required. The installed Codex runtime and account access are required for real replies. The demo seed includes a grant for sending its public records and conversation text to Codex; real farmer profiles require their own grants.
 
-The Nagpur sample point (21.15 N, 79.1 E) is a public demonstration grid point, not a surveyed farm location. Changing it invalidates rainfall projections for the old point until actual sources are refreshed. Invented field areas sum to 2.4 ha. The approved harvest-preparation checklist, separate pending proposal and confirmed work remain distinct; no irrigation dose or profitability promise is invented.
+Stop the demo backend before running `./scripts/sakha-demo reset`. Reset refuses normal unmarked databases and installations with additional farms. It discards changes made to this dedicated demo and restores the seed. `init` and `pnpm seed:demo` are idempotent. Files in `.local` are ignored; the seed code and attributed source snapshot are versioned.
+
+The demo farm is 21.15 N, 79.1 E, near Kalmeshwar. Other Indian locations keep their own coordinates. Soybean 1.6 ha and cotton 0.8 ha are the farmer's figures. The one approved plan is to cut the soybean in the dry week and sell at the cached Nagpur modal. The rupee benefit is the modal-minus-minimum gap on her expected quintals, not a promised sale. Soil moisture, pump hours, subsidy percents and the crop-insurance date are left unstated because they are not in the cache.
 
 The legacy `?demo=1` frontend fixture mode is a separate software-test fixture with synthetic datasets. Use the commands above for the presentation demo with actual sources and real agent turns.
 

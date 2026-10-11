@@ -11,7 +11,7 @@ import {
   sakhaChatEnabled,
   type searchWeb,
 } from "@sakha/core";
-import { createDataServices } from "@sakha/data";
+import { createDataServices, isIndianFarmLocation } from "@sakha/data";
 import {
   createDomainServices,
   createFarmServices,
@@ -19,6 +19,7 @@ import {
 } from "@sakha/farm";
 import Fastify from "fastify";
 import { z } from "zod";
+import { importAdapterCache } from "./adapter-import.js";
 import { isDemo } from "./demo.js";
 import { importDemoSources } from "./demo-sources.js";
 import { replayEvents } from "./events.js";
@@ -287,9 +288,39 @@ export function createApp(options: {
                     ? { ...x.freshness, status: "stale" as const }
                     : x.freshness,
               }));
+            const newest = (
+              a: { created_at: string; id: string },
+              b: { created_at: string; id: string },
+            ) =>
+              Date.parse(b.created_at) - Date.parse(a.created_at) ||
+              (a.id < b.id ? 1 : -1);
+            const teamOrder = ["sakha", "megha", "jal", "kheti", "paisa"];
+            const teamStatus = store
+              .list("team_status", farmId)
+              .flatMap((raw) => {
+                const parsed = z
+                  .object({
+                    team_id: c.AgentId,
+                    name: z.string(),
+                    line: z.string(),
+                  })
+                  .safeParse(raw);
+                return parsed.success
+                  ? [
+                      {
+                        id: parsed.data.team_id,
+                        name: parsed.data.name,
+                        line: parsed.data.line,
+                      },
+                    ]
+                  : [];
+              })
+              .sort(
+                (a, b) => teamOrder.indexOf(a.id) - teamOrder.indexOf(b.id),
+              );
             const briefing = findings
               .filter((x) => x.role_key === "sakha")
-              .at(-1);
+              .sort(newest)[0];
             return c.Home.parse({
               farm: profile,
               sections: {
@@ -303,16 +334,20 @@ export function createApp(options: {
                   },
                 },
                 context: farm.listFacts(farmId),
-                climate: findings.filter(
-                  (x) =>
-                    x.role_key === "megha" &&
-                    x.evidence.some((item) => item.source_id.startsWith("C")),
-                ),
-                weather: findings.filter(
-                  (x) =>
-                    x.role_key === "megha" &&
-                    x.evidence.some((item) => item.source_id.startsWith("W")),
-                ),
+                climate: findings
+                  .filter(
+                    (x) =>
+                      x.role_key === "megha" &&
+                      x.evidence.some((item) => item.source_id.startsWith("C")),
+                  )
+                  .sort(newest),
+                weather: findings
+                  .filter(
+                    (x) =>
+                      x.role_key === "megha" &&
+                      x.evidence.some((item) => item.source_id.startsWith("W")),
+                  )
+                  .sort(newest),
                 actions: store
                   .list("task", farmId)
                   .map((x) => c.Task.parse(x))
@@ -323,6 +358,7 @@ export function createApp(options: {
               alerts: store.list("alert", farmId).map((x) => c.Alert.parse(x)),
               insights: dataServices.insights(farmId),
               capabilities: dataServices.sources().map((x) => x.capability),
+              team_status: teamStatus,
             });
           }
           const scope = params.farmId ?? "installation";
@@ -374,12 +410,27 @@ export function createApp(options: {
           const saved = farm.execute(name as c.OperationName, input, params);
           if (name === "createFarm" || name === "updateFarm") {
             const profile = c.Farm.safeParse(saved);
-            if (
-              profile.success &&
-              profile.data.location?.latitude === c.nagpurPlace.latitude &&
-              profile.data.location.longitude === c.nagpurPlace.longitude
-            )
-              importDemoSources({ store, farm, dataServices }, profile.data.id);
+            if (profile.success) {
+              const latitude = profile.data.location?.latitude;
+              const longitude = profile.data.location?.longitude;
+              if (
+                latitude === c.nagpurPlace.latitude &&
+                longitude === c.nagpurPlace.longitude
+              )
+                importDemoSources(
+                  { store, farm, dataServices },
+                  profile.data.id,
+                );
+              if (
+                latitude !== undefined &&
+                longitude !== undefined &&
+                isIndianFarmLocation(latitude, longitude)
+              )
+                importAdapterCache(
+                  { store, farm, dataServices },
+                  profile.data.id,
+                );
+            }
           }
           return saved;
         };
@@ -508,16 +559,16 @@ export function createApp(options: {
   });
   for (const farmId of store.farms()) {
     const profile = farm.assertFarm(farmId);
+    const latitude = profile.location?.latitude;
+    const longitude = profile.location?.longitude;
+    if (latitude === undefined || longitude === undefined) continue;
     if (
-      profile.location?.latitude !== c.nagpurPlace.latitude ||
-      profile.location?.longitude !== c.nagpurPlace.longitude
+      latitude === c.nagpurPlace.latitude &&
+      longitude === c.nagpurPlace.longitude
     )
-      farm.execute(
-        "updateFarm",
-        { expected_version: profile.version, location: c.nagpurPlace },
-        { farmId },
-      );
-    importDemoSources({ store, farm, dataServices }, farmId);
+      importDemoSources({ store, farm, dataServices }, farmId);
+    if (isIndianFarmLocation(latitude, longitude))
+      importAdapterCache({ store, farm, dataServices }, farmId);
   }
   return { app, ...services, execution, sessionToken };
 }

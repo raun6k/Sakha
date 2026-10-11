@@ -4,14 +4,17 @@ import { dirname, join } from "node:path";
 import { importMarketQuote, refreshCoreEvidence } from "@sakha/data";
 import envPaths from "env-paths";
 import { createApp } from "./app.js";
-import { initializeDemo, resetDemo } from "./demo.js";
+import { initializeDemo, resetDemo, seedDemo } from "./demo.js";
 import { importDemoSources } from "./demo-sources.js";
 import { lockDatabase } from "./process-lock.js";
 
 const paths = envPaths("sakha", { suffix: "" });
+const [command, farmId, arg, extra] = process.argv.slice(2);
 const databasePath =
   (process.env.SAKHA_DATABASE_PATH?.trim() || undefined) ??
-  join(paths.data, "sakha.sqlite");
+  (command === "seed"
+    ? join(process.cwd(), ".local/demo/sakha.sqlite")
+    : join(paths.data, "sakha.sqlite"));
 mkdirSync(dirname(databasePath), { recursive: true, mode: 0o700 });
 const unlock = lockDatabase(databasePath);
 let services: ReturnType<typeof createApp>;
@@ -22,9 +25,27 @@ try {
   throw error;
 }
 const { app, store, farm, dataServices } = services;
-const [command, farmId, arg, extra] = process.argv.slice(2);
 try {
-  if (command === "demo" && ["init", "reset"].includes(farmId ?? "")) {
+  if (command === "seed") {
+    const seeded = await seedDemo(services, {
+      live: process.env.SAKHA_SEED_LIVE !== "0",
+    });
+    console.log(
+      JSON.stringify({
+        farm_id: seeded.profile.id,
+        name: seeded.profile.name,
+        village: seeded.profile.location?.village,
+        district: seeded.profile.location?.district,
+        database: databasePath,
+        demo: true,
+        sources: seeded.sources,
+        adapters: seeded.adapters,
+        rain_7d_mm: seeded.cache.brief.forecast_rain_7d_mm,
+        modal_inr: seeded.cache.brief.modal_inr,
+        benefit_inr: seeded.cache.recommendation.benefit_inr,
+      }),
+    );
+  } else if (command === "demo" && ["init", "reset"].includes(farmId ?? "")) {
     if (!process.env.SAKHA_DATABASE_PATH?.trim())
       throw new Error(
         "Set SAKHA_DATABASE_PATH to a dedicated demo database before initializing or resetting demo records",
@@ -115,7 +136,7 @@ try {
     );
   } else
     throw new Error(
-      "Usage: pnpm operator demo init|reset (explicit SAKHA_DATABASE_PATH) | farms | refresh FARM_ID [HISTORICAL_DAYS=30] [FORECAST_DAYS=7] | import FARM_ID CURATED_JSON RAW_PDF | market-import FARM_ID QUOTE_JSON RAW_SOURCE",
+      "Usage: pnpm seed:demo | pnpm operator demo init|reset (explicit SAKHA_DATABASE_PATH) | farms | refresh FARM_ID [HISTORICAL_DAYS=30] [FORECAST_DAYS=7] | import FARM_ID CURATED_JSON RAW_PDF | market-import FARM_ID QUOTE_JSON RAW_SOURCE",
     );
 } finally {
   try {
