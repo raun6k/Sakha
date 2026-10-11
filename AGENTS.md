@@ -6,7 +6,7 @@ Sakha is an open-source farming Command Center running in a local browser with o
 
 **Prioritize steady development with useful unit coverage and regular local commits.** Build several related pieces, check the completed part, commit, and continue. Do not interrupt every small edit with a build, full test suite, browser run or approval request. Fix failures caused by the change before calling that part complete. Speed must not come from hiding errors, bypassing authorization or inventing data.
 
-The repository currently contains planning documents and visual references, not an implemented application. Consult [the documentation map](docs/README.md) and only the owner documents relevant to the task:
+The repository now contains the integrated local application, planning documents and visual references. Check the implementation evidence for verified behavior and remaining live-provider/source gates. Consult [the documentation map](docs/README.md) and only the owner documents relevant to the task:
 
 - [Architecture](docs/architecture.md): shared state, agent collaboration, evidence, permissions and plan lifecycle.
 - [Build plan](docs/build-plan.md): shared foundation, parallel backend/frontend phases, contract ownership, handoff gates and one final integration/validation phase.
