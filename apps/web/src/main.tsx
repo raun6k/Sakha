@@ -1,54 +1,37 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Route, Routes } from "react-router";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { Shell } from "./components/shell";
-import { Loading, State } from "./components/ui";
-
+import { State } from "./components/ui";
+import { LanguageProvider } from "./language";
 import { FarmPage, Setup, Startup } from "./pages/farm";
-
 import { ServiceContext } from "./services/context";
-
 import { createHttpService } from "./services/http";
 import "./styles.css";
 
 const HomePage = lazy(() =>
   import("./pages/home").then((m) => ({ default: m.HomePage })),
 );
-const AgentsPage = lazy(() =>
-  import("./pages/agents").then((m) => ({ default: m.AgentsPage })),
-);
-const AskPage = lazy(() =>
-  import("./pages/agents").then((m) => ({ default: m.AskPage })),
-);
-const WorkspacePage = lazy(() =>
-  import("./pages/agents").then((m) => ({ default: m.WorkspacePage })),
+const TeamPage = lazy(() =>
+  import("./pages/team").then((m) => ({ default: m.TeamPage })),
 );
 const PlanPage = lazy(() =>
-  import("./pages/decisions").then((m) => ({ default: m.PlanPage })),
+  import("./pages/plan").then((m) => ({ default: m.PlanPage })),
 );
-const AlertsPage = lazy(() =>
-  import("./pages/decisions").then((m) => ({ default: m.AlertsPage })),
-);
-const ActivityPage = lazy(() =>
-  import("./pages/decisions").then((m) => ({ default: m.ActivityPage })),
-);
-const InsightsPage = lazy(() =>
-  import("./pages/support").then((m) => ({ default: m.InsightsPage })),
-);
-const SettingsPage = lazy(() =>
-  import("./pages/support").then((m) => ({ default: m.SettingsPage })),
-);
-const HelpPage = lazy(() =>
-  import("./pages/support").then((m) => ({ default: m.HelpPage })),
-);
+
+function Missing() {
+  return (
+    <div className="route-content">
+      <State title="This page is not here">
+        Use Home, Team, My Plan, or My Farm.
+      </State>
+    </div>
+  );
+}
+
 async function start() {
-  const demo = new URLSearchParams(window.location.search).get("demo") === "1";
-  const service = demo
-    ? (await import("./services/fixture")).createFixtureService({
-        setup: new URLSearchParams(window.location.search).get("setup") !== "1",
-      })
-    : createHttpService();
+  const service = createHttpService();
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { staleTime: 15000, retry: 1, refetchOnWindowFocus: false },
@@ -60,40 +43,61 @@ async function start() {
     createRoot(root).render(
       <StrictMode>
         <QueryClientProvider client={queryClient}>
-          <ServiceContext.Provider value={{ service, demo }}>
-            <BrowserRouter>
-              <Startup>
-                <Suspense fallback={<Loading />}>
-                  <Routes>
-                    <Route path="/setup" element={<Setup />} />
-                    <Route element={<Shell />}>
-                      <Route path="/" element={<HomePage />} />
-                      <Route path="/farm" element={<FarmPage />} />
-                      <Route path="/ask" element={<AskPage />} />
-                      <Route path="/agents" element={<AgentsPage />} />
-                      <Route
-                        path="/agents/:roleKey"
-                        element={<WorkspacePage />}
-                      />
-                      <Route path="/plan" element={<PlanPage />} />
-                      <Route path="/alerts" element={<AlertsPage />} />
-                      <Route path="/activity" element={<ActivityPage />} />
-                      <Route path="/insights" element={<InsightsPage />} />
-                      <Route path="/settings" element={<SettingsPage />} />
-                      <Route path="/help" element={<HelpPage />} />
-                      <Route
-                        path="*"
-                        element={
-                          <State title="Page not found">
-                            Choose one of the primary destinations to continue.
-                          </State>
-                        }
-                      />
-                    </Route>
-                  </Routes>
-                </Suspense>
-              </Startup>
-            </BrowserRouter>
+          <ServiceContext.Provider value={{ service, demo: false }}>
+            <LanguageProvider>
+              <BrowserRouter>
+                <Startup>
+                  <Suspense
+                    fallback={
+                      <div className="splash">
+                        <h1>Sakha</h1>
+                        <p>Opening Sakha…</p>
+                      </div>
+                    }
+                  >
+                    <Routes>
+                      <Route path="/setup" element={<Setup />} />
+                      <Route element={<Shell />}>
+                        <Route path="/" element={<HomePage />} />
+                        <Route path="/team" element={<TeamPage />} />
+                        <Route path="/team/:mateId" element={<TeamPage />} />
+                        <Route
+                          path="/ask"
+                          element={<Navigate to="/team" replace />}
+                        />
+                        <Route path="/plan" element={<PlanPage />} />
+                        <Route path="/farm" element={<FarmPage />} />
+                        <Route
+                          path="/agents/*"
+                          element={<Navigate to="/ask" replace />}
+                        />
+                        <Route
+                          path="/alerts"
+                          element={<Navigate to="/" replace />}
+                        />
+                        <Route
+                          path="/activity"
+                          element={<Navigate to="/plan" replace />}
+                        />
+                        <Route
+                          path="/insights"
+                          element={<Navigate to="/" replace />}
+                        />
+                        <Route
+                          path="/settings"
+                          element={<Navigate to="/farm" replace />}
+                        />
+                        <Route
+                          path="/help"
+                          element={<Navigate to="/farm" replace />}
+                        />
+                        <Route path="*" element={<Missing />} />
+                      </Route>
+                    </Routes>
+                  </Suspense>
+                </Startup>
+              </BrowserRouter>
+            </LanguageProvider>
           </ServiceContext.Provider>
         </QueryClientProvider>
       </StrictMode>,

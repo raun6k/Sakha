@@ -38,9 +38,7 @@ describe("farmer setup and updates", () => {
     mount(h(Setup), service);
     await user.click(screen.getByRole("button", { name: "Skip this step" }));
     await user.click(screen.getByRole("button", { name: "Skip this step" }));
-    await user.click(
-      screen.getByRole("button", { name: "Open my Command Center" }),
-    );
+    await user.click(screen.getByRole("button", { name: "See my farm" }));
     await waitFor(async () =>
       expect(
         (await service.execute("bootstrap", { input: {} })).readiness,
@@ -60,9 +58,7 @@ describe("farmer setup and updates", () => {
     );
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(
-      screen.getByRole("button", { name: "Open my Command Center" }),
-    );
+    await user.click(screen.getByRole("button", { name: "See my farm" }));
     await screen.findByRole("alert");
     expect(useUi.getState().setup.name).toBe("Draft farm");
     expect((await service.execute("bootstrap", { input: {} })).readiness).toBe(
@@ -103,9 +99,9 @@ describe("farmer setup and updates", () => {
       }),
       service,
     );
-    await screen.findByLabelText("Your report");
-    await user.selectOptions(screen.getByLabelText("Your report"), "Little");
-    await user.click(screen.getByRole("button", { name: "Save farm update" }));
+    await screen.findByLabelText("Your note");
+    await user.selectOptions(screen.getByLabelText("Your note"), "Little");
+    await user.click(screen.getByRole("button", { name: "Save this note" }));
     await waitFor(() => expect(close).toHaveBeenCalledOnce());
     const facts = await service.execute("listFacts", {
       params: { farmId: "fixture-farm" },
@@ -122,10 +118,10 @@ it("keeps the same command identity when a farmer explicitly retries an uncertai
   const execute = vi.spyOn(service, "execute");
   const user = userEvent.setup();
   mount(h(QuickUpdate, { open: true, onClose: vi.fn() }), service);
-  await user.selectOptions(screen.getByLabelText("Your report"), "Flowering");
-  await user.click(screen.getByRole("button", { name: "Save farm update" }));
+  await user.selectOptions(screen.getByLabelText("Your note"), "Flowering");
+  await user.click(screen.getByRole("button", { name: "Save this note" }));
   await screen.findByRole("alert");
-  await user.click(screen.getByRole("button", { name: "Save farm update" }));
+  await user.click(screen.getByRole("button", { name: "Save this note" }));
   await waitFor(() =>
     expect(
       execute.mock.calls.filter(([name]) => name === "saveFact"),

@@ -111,7 +111,7 @@ export function createHttpService(fetcher: typeof fetch = fetch): SakhaService {
       throw new ServiceError({
         code: "unavailable",
         message:
-          "The local Sakha backend cannot be reached. Start it and try again. Monitoring is paused.",
+          "Sakha cannot reach the helper on this computer. Start Sakha and try again.",
         retryable: true,
         request_id: "connection",
       });

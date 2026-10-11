@@ -7,15 +7,17 @@ import userEvent from "@testing-library/user-event";
 import { createElement as h, StrictMode } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ChartCard } from "../components/evidence";
+import { RainChart } from "../components/rain-chart";
 import { Shell } from "../components/shell";
+import { greeting } from "../farmer";
+import { LanguageProvider } from "../language";
 import { ServiceContext } from "../services/context";
 import { createFixtureService } from "../services/fixture";
 import { useUi } from "../state/ui";
-import { AgentsPage, ConversationView } from "./agents";
-import { PlanPage, WorkConfirmation } from "./decisions";
-import { greeting, HomePage } from "./home";
-import { InsightsPage, SettingsPage } from "./support";
+import { Thread } from "./ask";
+import { HomePage } from "./home";
+import { PlanPage } from "./plan";
+import { TeamPage } from "./team";
 
 function mount(
   component: React.ReactNode,
@@ -35,7 +37,11 @@ function mount(
         h(
           ServiceContext.Provider,
           { value: { service, demo: true } },
-          h(MemoryRouter, { initialEntries: [entry as string] }, component),
+          h(
+            LanguageProvider,
+            null,
+            h(MemoryRouter, { initialEntries: [entry] }, component),
+          ),
         ),
       ),
     ),
@@ -45,15 +51,17 @@ function mount(
 afterEach(() => {
   cleanup();
   useUi.setState({ composer: {} });
+  localStorage.removeItem("sakha-lang");
 });
+
 describe("conversation interaction", () => {
-  it("submits one question from Home even with StrictMode effects and stream refetches", async () => {
+  it("submits one question and shows a checked card", async () => {
     const service = createFixtureService();
     const execute = vi.spyOn(service, "execute");
     const roles = await service.execute("listAgents", { input: {} });
-    const role = roles.find((r) => r.key === "chief_of_staff") as Role;
-    mount(h(ConversationView, { role }), service, {
-      pathname: "/ask",
+    const role = roles.find((item) => item.key === "chief_of_staff") as Role;
+    mount(h(Thread, { role }), service, {
+      pathname: "/team",
       state: { question: "How should I plan?", questionId: "home-1" },
     });
     await waitFor(() =>
@@ -61,14 +69,12 @@ describe("conversation interaction", () => {
         execute.mock.calls.filter(([name]) => name === "submitTurn"),
       ).toHaveLength(1),
     );
-    await screen.findByText(
-      "Your farm facts, proposed plans and completed work remain distinct. You can inspect recorded context in My Farm or review the synthetic proposal in Farm Plan.",
-    );
+    await screen.findByText("Checked by Sakha");
     expect(
       execute.mock.calls.filter(([name]) => name === "submitTurn"),
     ).toHaveLength(1);
   });
-  it("keeps an unsent draft when the runtime is unavailable", async () => {
+  it("hides the composer when chat is not available", async () => {
     const service = createFixtureService();
     const role = (
       await service.execute("listAgents", { input: {} })
@@ -82,252 +88,118 @@ describe("conversation interaction", () => {
       },
     ];
     const execute = vi.spyOn(service, "execute");
-    const user = userEvent.setup();
-    mount(h(ConversationView, { role }), service);
-    await user.type(screen.getByLabelText(`Ask ${role.name}`), "My question");
-    expect(
-      screen
-        .getByRole("button", { name: "Send question" })
-        .hasAttribute("disabled"),
-    ).toBe(true);
+    mount(h(Thread, { role }), service);
+    await screen.findByText(/Sakha cannot answer yet/);
+    expect(screen.queryByLabelText("Your question")).toBeNull();
     expect(execute.mock.calls.some(([name]) => name === "submitTurn")).toBe(
       false,
     );
-    expect(useUi.getState().composer[role.key]).toBe("My question");
   });
-  it("retains the text after a failed turn and does not silently invent a response", async () => {
+  it("retains the text after a failed turn", async () => {
     const service = createFixtureService({ failure: "submitTurn" });
     const role = (
       await service.execute("listAgents", { input: {} })
     )[0] as Role;
     const user = userEvent.setup();
-    mount(h(ConversationView, { role }), service);
-    await user.type(
-      screen.getByLabelText(`Ask ${role.name}`),
-      "Failed question",
-    );
-    await user.click(screen.getByRole("button", { name: "Send question" }));
+    mount(h(Thread, { role }), service);
+    await user.type(screen.getByLabelText("Your question"), "Failed question");
+    await user.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByRole("alert");
     expect(
-      (screen.getByLabelText(`Ask ${role.name}`) as HTMLTextAreaElement).value,
+      (screen.getByLabelText("Your question") as HTMLTextAreaElement).value,
     ).toBe("Failed question");
   });
 });
-describe("plans, actual work and history", () => {
-  it("approval records a decision but no actual work, then separate confirmation records work", async () => {
+
+describe("plans", () => {
+  it("saving a suggestion records no completed work", async () => {
     const service = createFixtureService();
     const user = userEvent.setup();
     mount(h(PlanPage), service);
     await user.click(
-      await screen.findByRole("button", { name: "Review revision" }),
+      await screen.findByRole("button", { name: "Save this plan" }),
     );
-    await user.click(
-      screen.getByLabelText(
-        "I reviewed this exact revision and its assumptions.",
-      ),
-    );
-    await user.click(screen.getByRole("button", { name: "Confirm decision" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    let history = await service.execute("listActivity", {
-      params: { farmId: "fixture-farm" },
-      input: {},
+    await waitFor(async () => {
+      const history = await service.execute("listActivity", {
+        params: { farmId: "fixture-farm" },
+        input: {},
+      });
+      expect(
+        history.items.filter((item) => item.kind === "actual_work"),
+      ).toHaveLength(0);
+      expect(history.items.some((item) => item.kind === "plan_decision")).toBe(
+        true,
+      );
     });
-    expect(history.items.filter((x) => x.kind === "actual_work")).toHaveLength(
-      0,
-    );
-    await user.click(
-      await screen.findByRole("button", { name: "Report completed work" }),
-    );
-    await user.selectOptions(
-      screen.getByLabelText("Activity type"),
-      "observation",
-    );
-    await user.click(
-      screen.getByLabelText("I confirm this work actually happened."),
-    );
-    await user.click(
-      screen.getByRole("button", { name: "Confirm completed work" }),
-    );
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    history = await service.execute("listActivity", {
-      params: { farmId: "fixture-farm" },
-      input: {},
-    });
-    expect(history.items.map((x) => x.kind)).toEqual([
-      "plan_decision",
-      "actual_work",
-    ]);
-  });
-  it("not yet / cancel makes no mutation", async () => {
-    const service = createFixtureService();
-    const execute = vi.spyOn(service, "execute");
-    const user = userEvent.setup();
-    const close = vi.fn();
-    mount(h(WorkConfirmation, { onClose: close }), service);
-    await user.click(screen.getByRole("button", { name: "Not yet / cancel" }));
-    expect(close).toHaveBeenCalledOnce();
-    expect(execute.mock.calls.some(([name]) => name === "recordActivity")).toBe(
-      false,
-    );
-  });
-  it("unknown work quantity stays absent rather than zero", async () => {
-    const service = createFixtureService();
-    const user = userEvent.setup();
-    const close = vi.fn();
-    mount(h(WorkConfirmation, { onClose: close }), service);
-    await user.type(screen.getByLabelText("What happened?"), "Checked field");
-    await user.click(
-      screen.getByLabelText("I confirm this work actually happened."),
-    );
-    await user.click(
-      screen.getByRole("button", { name: "Confirm completed work" }),
-    );
-    await waitFor(() => expect(close).toHaveBeenCalledOnce());
-    const history = await service.execute("listActivity", {
-      params: { farmId: "fixture-farm" },
-      input: {},
-    });
-    const activity = await service.execute("getActivity", {
-      params: {
-        farmId: "fixture-farm",
-        activityId: history.items[0]?.record_id ?? "",
-      },
-      input: {},
-    });
-    expect(activity.quantity).toBeUndefined();
-    expect(activity.provenance.effective_time_precision).toBe("date");
-  });
-});
-describe("evidence and privacy interactions", () => {
-  it("preserves ENSO filter and shows accessible value table with a gap", async () => {
-    mount(
-      h(InsightsPage),
-      createFixtureService(),
-      "/insights?series=C01&range=5years",
-    );
-    await screen.findByRole("heading", { name: "RONI" });
-    expect(
-      (screen.getByLabelText("Time range") as HTMLSelectElement).value,
-    ).toBe("5years");
-    expect(screen.getByText("Missing")).toBeTruthy();
-    expect(
-      screen
-        .getByRole("link", { name: "Ask the specialist" })
-        .getAttribute("href"),
-    ).toContain("snapshot=fixture-snapshot-0");
-  });
-  it("does not delete any data when the review dialog is cancelled", async () => {
-    const service = createFixtureService();
-    const execute = vi.spyOn(service, "execute");
-    const user = userEvent.setup();
-    mount(h(SettingsPage), service);
-    await user.click(
-      await screen.findByRole("button", { name: "Review deletion options" }),
-    );
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(
-      execute.mock.calls.some(([name]) => name === "requestDeletion"),
-    ).toBe(false);
-  });
-  it("directory contains eight specialists and keeps A0 separate", async () => {
-    mount(h(AgentsPage));
-    await screen.findByRole("heading", { name: "Water & Irrigation" });
-    expect(
-      screen.getAllByRole("link", { name: "Chat with specialist" }),
-    ).toHaveLength(8);
-    expect(
-      screen.queryByRole("heading", { name: "Chief of Staff" }),
-    ).toBeNull();
-    expect(screen.getByRole("link", { name: "Ask Sakha" })).toBeTruthy();
   });
 });
 
-it("preserves published-month windows and seasonal labels in chart context", async () => {
-  const service = createFixtureService();
-  const insights = await service.execute("getInsights", {
-    params: { farmId: "fixture-farm" },
-    input: { series: "W03" },
-  });
-  const series = insights.series[0];
-  if (!series) throw new Error("Fixture series missing");
-  series.unit = "mm/month";
-  const point = series.points[0];
-  if (point) point.label = "Published October";
-  mount(h(ChartCard, { series, compact: true }), service);
-  expect(
-    screen.getByRole("link", { name: "Expand" }).getAttribute("href"),
-  ).toContain("range=12months");
-  await userEvent.setup().click(screen.getByText("Read values as a table"));
-  expect(screen.getByRole("cell", { name: "Published October" })).toBeDefined();
-});
-it("allows general specialist conversations without requiring optional private finance or support fields", async () => {
-  const service = createFixtureService();
-  const execute = vi.spyOn(service, "execute");
-  const user = userEvent.setup();
-  mount(h(SettingsPage), service);
-  await user.click(
-    await screen.findByRole("checkbox", { name: /Allow my conversation text/ }),
-  );
-  await user.click(
-    screen.getByRole("checkbox", { name: /I understand this scope/ }),
-  );
-  await user.click(screen.getByRole("button", { name: "Grant this scope" }));
-  await waitFor(() =>
-    expect(execute.mock.calls.some(([name]) => name === "grantConsent")).toBe(
-      true,
-    ),
-  );
-  const request = execute.mock.calls.find(
-    ([name]) => name === "grantConsent",
-  )?.[1];
-  expect(request?.input).toMatchObject({
-    external_processing: true,
-    roles: expect.arrayContaining([
-      "chief_of_staff",
-      "farm_finance",
-      "government_support",
-    ]),
-    fields: expect.arrayContaining(["conversation", "F01", "F03", "F04"]),
-  });
-  expect(request?.input).toMatchObject({
-    fields: expect.not.arrayContaining(["F05", "F08"]),
-  });
-});
-
-describe("demo navigation and welcome", () => {
+describe("home, team and rain", () => {
   it("uses short time-based greetings", () => {
-    expect(greeting(8)).toBe("Good morning");
-    expect(greeting(12)).toBe("Good afternoon");
-    expect(greeting(19)).toBe("Good evening");
+    expect(greeting(8, "en")).toBe("Good morning");
+    expect(greeting(12, "en")).toBe("Good afternoon");
+    expect(greeting(19, "en")).toBe("Good evening");
   });
-  it("shows all nine agent cards and omits the profile name from the hero", async () => {
+  it("shows the daily brief, the five teammates and a checked card", async () => {
     mount(h(HomePage));
-    await screen.findByRole("heading", {
-      name: /Good morning|Good afternoon|Good evening/,
-    });
-    expect(document.querySelectorAll(".role-card-compact")).toHaveLength(9);
-    expect(document.querySelector(".home-hero")?.textContent).not.toContain(
-      "validation",
-    );
+    await screen.findByRole("heading", { name: "Daily Brief" });
+    await screen.findByRole("heading", { name: "Safe" });
+    for (const name of ["Sakha", "Megha", "Jal", "Kheti", "Paisa"])
+      expect(screen.getAllByText(name).length).toBeGreaterThan(0);
+    expect(screen.getByText("Checked by Sakha")).toBeTruthy();
+    expect(screen.getByText("Cost ₹")).toBeTruthy();
+    expect(screen.getByText("Benefit ₹")).toBeTruthy();
+    const axis = document.querySelector(".rain-y")?.textContent ?? "";
+    expect(axis).toContain("0");
+    expect(axis).toContain("6");
+    expect(axis).toContain("12");
   });
-  it("expands nine agents and opens location editing from the top bar", async () => {
+  it("opens teammate chats from the team tab", async () => {
+    mount(h(TeamPage));
+    await screen.findByRole("heading", { name: "Your farm team" });
+    expect(screen.getAllByRole("link", { name: /Talk/ })).toHaveLength(4);
+  });
+  it("keeps four farmer tabs", async () => {
     const user = userEvent.setup();
     mount(h(Shell));
-    await user.click(
-      screen.getByRole("button", { name: "Agents", expanded: false }),
+    expect(screen.getByRole("link", { name: "Home" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Team" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "My Plan" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "My Farm" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Agents" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "हिन्दी" }));
+    expect(screen.getByRole("link", { name: "होम" })).toBeTruthy();
+  });
+  it("labels a small rain axis in millimetres", () => {
+    const service = createFixtureService();
+    mount(
+      h(RainChart, {
+        series: {
+          id: "tiny",
+          source_id: "W04",
+          snapshot_id: "s",
+          evidence_id: "e",
+          method_version: "t",
+          variable: "Rain",
+          unit: "mm/day",
+          kind: "forecast",
+          geography: "Nagpur",
+          resolution: "day",
+          supported_range: { from: "2026-10-11", to: "2026-10-12" },
+          freshness: { status: "fresh", retrieved_at: "2026-10-11T00:00:00Z" },
+          completeness: "complete",
+          origin: "fixture",
+          points: [
+            { time: "2026-10-11T00:00:00Z", value: 0.2 },
+            { time: "2026-10-12T00:00:00Z", value: null },
+          ],
+        },
+      }),
+      service,
     );
-    await waitFor(() =>
-      expect(document.querySelectorAll("#sidebar-agents a")).toHaveLength(10),
-    );
-    expect(
-      document.querySelector(
-        '#sidebar-agents a[href="/agents/climate?tab=chat"]',
-      ),
-    ).not.toBeNull();
-    await user.click(
-      screen.getByRole("button", { name: "Edit farm location" }),
-    );
-    await screen.findByRole("heading", { name: "Review farm location" });
-    expect(screen.getByText(/Nagpur district, Maharashtra/)).toBeDefined();
+    const axis = document.querySelector(".rain-y")?.textContent ?? "";
+    expect(axis).toContain("0");
+    expect(axis).toContain("0.5");
+    expect(axis).toContain("1");
   });
 });
