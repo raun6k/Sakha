@@ -1,6 +1,9 @@
+import { Info } from "lucide-react";
+import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { Avatar } from "../components/avatar";
 import { FieldArt } from "../components/field-art";
+import { HowTeamWorks } from "../components/how-team-works";
 import { State } from "../components/ui";
 import { t } from "../copy";
 import { useLang } from "../language";
@@ -17,6 +20,7 @@ export function TeamPage() {
   const { lang } = useLang();
   const { mateId } = useParams();
   const farmId = useFarmId();
+  const [how, setHow] = useState(false);
   const home = useRead(
     "getHome",
     { params: { farmId }, input: {} },
@@ -64,7 +68,16 @@ export function TeamPage() {
             <p>{current?.role}</p>
             <p>{current?.status}</p>
           </div>
+          <button
+            type="button"
+            className="icon-button how-info"
+            aria-label={t(lang, "howTeamWorks")}
+            onClick={() => setHow(true)}
+          >
+            <Info size={26} />
+          </button>
         </header>
+        <HowTeamWorks open={how} onClose={() => setHow(false)} />
         <Thread role={role.data} mate={mate} embedded />
       </div>
     );
@@ -77,11 +90,25 @@ export function TeamPage() {
           <p>{current?.role}</p>
           <p>{current?.status}</p>
         </div>
+        <button
+          type="button"
+          className="icon-button how-info"
+          aria-label={t(lang, "howTeamWorks")}
+          onClick={() => setHow(true)}
+        >
+          <Info size={26} />
+        </button>
       </header>
+      <HowTeamWorks open={how} onClose={() => setHow(false)} />
       <Thread role={role.data} mate="sakha" embedded />
       <div className="teammate-grid">
         {team.map((item) => (
-          <Link className="teammate-card" key={item.id} to={`/team/${item.id}`}>
+          <Link
+            className={`teammate-card agent-${item.id}`}
+            key={item.id}
+            to={`/team/${item.id}`}
+            style={{ borderColor: item.color }}
+          >
             <Avatar id={item.id} color={item.color} />
             <div>
               <strong>{item.name}</strong>

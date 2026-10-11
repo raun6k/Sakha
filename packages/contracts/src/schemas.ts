@@ -247,6 +247,16 @@ export const TeamCard = z.object({
 export type TeamCard = z.infer<typeof TeamCard>;
 export const Card = TeamCard;
 export type Card = TeamCard;
+/** A real Cedar allow/deny pair for one out-of-lane question. */
+export const LaneBlock = z.object({
+  denied_principal: RoleKey,
+  denied_action: z.string().min(1),
+  denied_message: z.string().min(1),
+  allowed_principal: RoleKey,
+  allowed_action: z.string().min(1),
+  allowed_decision: z.literal("allow"),
+});
+export type LaneBlock = z.infer<typeof LaneBlock>;
 export const RunState = z.enum([
   "queued",
   "running",
@@ -283,11 +293,13 @@ export const Message = RecordBase.extend({
     /** Sakha checked this answer before the farmer saw it. */
     reviewed_by: z.literal("sakha").optional(),
     card: TeamCard.optional(),
+    lane_block: LaneBlock.optional(),
   }),
   team_id: AgentId.optional(),
   reviewed_by: AgentId.optional(),
   consulted: z.array(AgentId).optional(),
   card: Card.optional(),
+  lane_block: LaneBlock.optional(),
 });
 export const Conversation = RecordBase.extend({
   role_key: RoleKey,

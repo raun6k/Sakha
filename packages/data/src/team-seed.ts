@@ -39,6 +39,12 @@ export type SeedMessage = {
   reviewed_by?: AgentId;
   consulted?: AgentId[];
   card?: Card;
+  /** Persist runs Cedar for this pair and stores the real decision. */
+  lane_check?: {
+    denied_role: AgentId;
+    allowed_role: AgentId;
+    action: string;
+  };
 };
 
 export type SeedThread = {
@@ -123,7 +129,11 @@ function say(value: Card, hindi?: string) {
 function pair(
   question: string,
   value: Card,
-  extra?: { consulted?: AgentId[]; hindi?: string },
+  extra?: {
+    consulted?: AgentId[];
+    hindi?: string;
+    lane_check?: SeedMessage["lane_check"];
+  },
 ): SeedMessage[] {
   return [
     { author: "farmer", text: question },
@@ -133,6 +143,7 @@ function pair(
       reviewed_by: "sakha",
       consulted: extra?.consulted,
       card: value,
+      lane_check: extra?.lane_check,
     },
   ];
 }
@@ -339,9 +350,9 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
     headline: "No spray clearance without a wind reading",
     do: [
       `Do not treat ${pretty(tomorrow?.date ?? plusDays(today, 1))} as a spray window.`,
-      "Ask again when a wind reading is actually on file.",
+      "Wait for a wind reading before you spray.",
     ],
-    why: `Tomorrow's Open-Meteo row is ${tomorrow?.rain_mm ?? "unknown"} mm of rain with a ${tomorrow?.rain_probability_pct ?? "unknown"}% chance, fetched ${fetched}. Wind is not in that file, so I cannot clear a spray window.`,
+    why: `Tomorrow's Open-Meteo row is ${tomorrow?.rain_mm ?? "unlisted"} mm of rain with a ${tomorrow?.rain_probability_pct ?? "unlisted"}% chance, fetched ${fetched}. That row has no wind speed, so I will not clear a spray window.`,
     risk: "medium",
     confidence: "low",
     sources: [forecastSource],
@@ -363,7 +374,7 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
       `Record ${brief.season_rain_mm} mm from ${pretty(brief.season_from)} to ${pretty(brief.season_to)}.`,
       powerSource && brief.power_rain_mm !== null
         ? `NASA POWER adds ${brief.power_rain_mm} mm from ${pretty(brief.power_from ?? "")} to ${pretty(brief.power_to ?? "")}.`
-        : "No second rainfall total is on file.",
+        : "Use this Open-Meteo total until a second rainfall series is saved.",
     ],
     why: `Both totals were fetched ${fetched}. I do not have a normal-rainfall figure for ${brief.district}, so this is not a deficit or a surplus.`,
     risk: "low",
@@ -377,7 +388,7 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
       `Give the ${brief.soybean_ha} ha soybean 0 mm on ${pretty(today)}.`,
       "Keep the borewell for the cotton until a soil reading exists.",
     ],
-    why: `Open-Meteo, fetched ${fetched}, shows ${brief.forecast_rain_7d_mm} mm of rain and ${brief.forecast_et0_7d_mm} mm of evaporation over seven days. Soil moisture was not measured, and pump hours are not calculated because horsepower and the power tariff are not on file.`,
+    why: `Open-Meteo, fetched ${fetched}, shows ${brief.forecast_rain_7d_mm} mm of rain and ${brief.forecast_et0_7d_mm} mm of evaporation over seven days. Soil moisture is still unmeasured, so leave the pump off until you note its horsepower and the power tariff.`,
     cost_inr: 0,
     risk: "medium",
     confidence: "medium",
@@ -387,19 +398,18 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
   });
   const drip = card({
     agent: "jal",
-    headline: "Drip savings percent is not on file",
+    headline: "Ask the KVK before you buy drip",
     do: [
-      "Do not treat a savings percent as known.",
-      "Ask Paisa only for a subsidy figure that is actually published.",
+      "Keep the present watering method until a dated comparison exists.",
+      "Ask the district agriculture office for the current drip scheme.",
     ],
-    why: `The water method on this farm is not recorded, and no drip-versus-flood comparison is in the fetched files. A subsidy percent is Paisa's lane, and it is not in the cache either.`,
+    why: `This farm has not recorded drip or flood, and these files have no drip-versus-flood comparison. A subsidy percent is Paisa's lane, so ask the office before you budget one.`,
     risk: "low",
     confidence: "low",
     sources: [farmerSource],
     handoff_suggestion: {
       to: "paisa",
-      reason:
-        "A drip subsidy percent is Paisa's lane, and none is in the cached files.",
+      reason: "A drip subsidy percent is Paisa's lane.",
     },
   });
   const borewell = card({
@@ -410,7 +420,7 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
       `Leave about ${rupee(rec.borewell_held_m3)} m3 unpumped on the ${brief.soybean_ha} ha soybean.`,
       `Keep that borewell for the ${brief.cotton_ha} ha cotton.`,
     ],
-    why: `That volume is evaporation minus rain over seven days, spread across the soybean area, using the Open-Meteo totals fetched ${fetched}. It is water not applied, not a rupee cost, because the pump tariff is unknown.`,
+    why: `That volume is evaporation minus rain over seven days, spread across the soybean area, using the Open-Meteo totals fetched ${fetched}. It is water held back. Bring the power tariff before anyone turns it into rupees.`,
     cost_inr: 0,
     risk: "medium",
     confidence: "medium",
@@ -420,12 +430,12 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
   });
   const pump = card({
     agent: "jal",
-    headline: "Pump hours and power cost are unknown",
+    headline: "Leave the soybean pump off",
     do: [
       "Do not run the pump for the soybean this week.",
-      "Record pump horsepower before anyone quotes hours or rupees.",
+      "Write down the pump horsepower and the unit rate from the power bill.",
     ],
-    why: "Pump horsepower is unset and no rupee-per-unit or diesel rate was fetched. I will not invent hours or a power bill.",
+    why: "Until those two numbers are written down, any hour count or power bill would be a guess. Leave the soybean pump off.",
     cost_inr: 0,
     risk: "low",
     confidence: "low",
@@ -440,7 +450,7 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
       `Count day ${das} from the ${pretty(SOWING_DATE)} sowing the farmer reported.`,
       "Treat the stage as pods drying, and confirm the green patch with the local KVK.",
     ],
-    why: `Variety was not stated and no soil test is on file, so this is a calendar check from the farmer's sowing date, not a variety-maturity table. The dry forecast supports a harvest look this week; Megha has the rain numbers.`,
+    why: `Get a free soil test at your KVK; until then this is a calendar check from the sowing date you reported. The dry forecast still supports a harvest look this week.`,
     risk: "medium",
     confidence: "medium",
     sources: [farmerSource, forecastSource],
@@ -459,12 +469,12 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
   });
   const urea = card({
     agent: "kheti",
-    headline: "No urea dose without a soil test",
+    headline: "Get a free soil test at your KVK",
     do: [
-      "Do not apply a urea dose from this chat.",
-      "Bring a soil test result before asking for nitrogen.",
+      "Visit your Krishi Vigyan Kendra and ask for a soil test.",
+      "Until that card comes back, do not add urea.",
     ],
-    why: "The soil card is not tested, so nitrogen, phosphorus, potassium, pH and organic carbon are unknown. A dose without that card would be a guess.",
+    why: "The safe default is no extra nitrogen. A dose before the soil card would be a guess.",
     risk: "low",
     confidence: "low",
     sources: [farmerSource],
@@ -504,24 +514,24 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
   });
   const subsidy = card({
     agent: "paisa",
-    headline: "Drip subsidy percent is not on file",
+    headline: "Ask the office for the drip scheme",
     do: [
-      "Do not quote a subsidy percent or a rupee refund.",
-      "Check the state portal only when a dated government figure is in hand.",
+      "Do not budget a subsidy percent from this chat.",
+      "Ask the district agriculture office for the current drip notice.",
     ],
-    why: `No PMKSY percent or installment amount was in the files fetched ${fetched}. The PIB page on file is the soybean MSP, not a drip subsidy.`,
+    why: `The government page fetched ${fetched} is the soybean MSP from PIB. Use that office notice before you count on a drip refund.`,
     risk: "low",
     confidence: "low",
     sources: [mspSource],
   });
   const insurance = card({
     agent: "paisa",
-    headline: "Insurance deadline is not in the file",
+    headline: "Ask your bank for the PMFBY date",
     do: [
-      "Do not treat any date here as the crop-insurance deadline.",
-      "Read the current PMFBY notice before you enrol or claim.",
+      "Ask the bank or the common service centre for this season's cutoff.",
+      "Do not enrol or claim from a date in this chat.",
     ],
-    why: `No PMFBY cutoff was fetched ${fetched}. I will not invent a last date or a claim amount.`,
+    why: `These price files, fetched ${fetched}, do not carry a crop-insurance cutoff. The bank notice is the date that counts.`,
     risk: "medium",
     confidence: "low",
     sources: [mspSource],
@@ -534,7 +544,7 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
       `Count ₹${rupee(rec.benefit_inr)} as the modal-minus-minimum gap on ${rec.quintals} quintal.`,
       "Stored soybean is 0 quintal until the cut is weighed.",
     ],
-    why: `The yield of ${brief.yield_q_per_ha} quintal per hectare is the farmer's expectation, not a weighment. Transport, bags and moisture cuts are not in the price file.`,
+    why: `The yield of ${brief.yield_q_per_ha} quintal per hectare is the farmer's expectation, not a weighment. Ask the buyer about transport, bags and moisture cuts before you treat the gap as cash in hand.`,
     cost_inr: rec.cost_inr,
     benefit_inr: rec.benefit_inr,
     risk: "medium",
@@ -550,7 +560,7 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
       `Megha: ${brief.forecast_rain_7d_mm} mm of rain and ${brief.forecast_et0_7d_mm} mm of evaporation.`,
       "Jal: soil moisture is not measured, so no pump hours and no power bill.",
     ],
-    why: `The two readings agree: do not irrigate drying soybean this week. A soil moisture percent is not on file, so nobody should invent one.`,
+    why: `The two readings agree: do not irrigate drying soybean this week. Leave the soil-moisture percent blank until you measure it.`,
     cost_inr: 0,
     risk: "medium",
     confidence: "medium",
@@ -576,12 +586,12 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
   });
   const pumpConsult = card({
     agent: "sakha",
-    headline: "Pumping soybean has no cost on file",
+    headline: "Do not pump the soybean this week",
     do: [
       "Do not start the pump for the soybean.",
       "Bring pump horsepower and the power tariff before asking for a bill.",
     ],
-    why: `Jal will not invent pump hours or a rupee-per-unit rate. The ${rupee(rec.borewell_held_m3)} m3 figure is water not applied, not money saved.`,
+    why: `Jal will not invent pump hours or a rupee-per-unit rate. The ${rupee(rec.borewell_held_m3)} m3 figure is water held back, not money saved.`,
     cost_inr: 0,
     risk: "low",
     confidence: "low",
@@ -613,7 +623,7 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
         (item) =>
           `${item.mandi}: ₹${rupee(item.modal_inr)} per quintal on ${pretty(item.date)}.`,
       ),
-    why: `These are the latest cached rows for each mandi, fetched ${fetched}. A higher modal at another mandi does not include transport, which is not in the file.`,
+    why: `These are the latest cached rows for each mandi, fetched ${fetched}. A higher modal at another mandi still needs your own transport cost, so compare the buyer at the gate first.`,
     cost_inr: rec.cost_inr,
     benefit_inr: rec.benefit_inr,
     risk: "medium",
@@ -635,6 +645,22 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
     confidence: "medium",
     sources: [marketSource, mspSource],
     prices,
+  });
+  const mandiHandoff = card({
+    agent: "megha",
+    headline: "Mandi prices belong to Paisa",
+    do: [
+      "Ask Paisa for the Nagpur mandi price.",
+      `Paisa has the cached modal at ₹${rupee(brief.modal_inr)} per quintal.`,
+    ],
+    why: `Rain and the Pacific index are my lane. A mandi quote is Paisa's, so Sakha sends this question to Paisa.`,
+    risk: "low",
+    confidence: "high",
+    sources: [forecastSource, marketSource],
+    handoff_suggestion: {
+      to: "paisa",
+      reason: "Mandi prices are Paisa's lane.",
+    },
   });
 
   const threads: SeedThread[] = [
@@ -661,6 +687,13 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
       kind: "primary",
       messages: [
         ...pair("क्या इस हफ्ते बारिश होगी? Will it rain this week?", rainCard),
+        ...pair("What is today's mandi price?", mandiHandoff, {
+          lane_check: {
+            denied_role: "megha",
+            allowed_role: "paisa",
+            action: "mandi",
+          },
+        }),
         ...pair("Is El Niño bad for my soybean?", ensoCard),
         ...pair("Can I spray tomorrow?", spray),
         ...pair("How much rain fell since June?", season),
@@ -836,7 +869,12 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
       "No heat, frost or warning alert was sent.",
     ),
     memory("jal", "jal.water_source", "borewell", "borewell"),
-    memory("jal", "jal.pump_hp", null, "Unknown. Do not invent pump hours."),
+    memory(
+      "jal",
+      "jal.pump_hp",
+      null,
+      "Write down horsepower before quoting pump hours.",
+    ),
     memory(
       "jal",
       "jal.last_irrigation_date",
@@ -878,7 +916,7 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
       "kheti",
       "kheti.soil_card",
       null,
-      "Not tested. Nitrogen, phosphorus, potassium, pH and organic carbon are unknown.",
+      "Get a free soil test at your KVK before any fertiliser dose.",
     ),
     memory(
       "kheti",
@@ -902,7 +940,7 @@ export function buildTeamSeed(cache: DemoCache): TeamSeed {
       "paisa",
       "paisa.enrolled_schemes",
       [],
-      "Unknown. No PM-KISAN, PMFBY or PMKSY enrolment is recorded.",
+      "No PM-KISAN, PMFBY or PMKSY enrolment is recorded. Ask the bank before counting on a scheme.",
     ),
     memory(
       "paisa",

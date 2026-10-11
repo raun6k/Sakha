@@ -101,6 +101,22 @@ it("serves the seeded team on the home screen", async () => {
   expect(replies.every((row) => (row.card?.sources?.length ?? 0) >= 1)).toBe(
     true,
   );
+  const blocked = replies.find(
+    (row) =>
+      (row as { lane_block?: { denied_action?: string } }).lane_block
+        ?.denied_action === "mandi",
+  ) as {
+    lane_block?: {
+      denied_principal: string;
+      denied_message: string;
+      allowed_principal: string;
+      allowed_decision: string;
+    };
+  };
+  expect(blocked?.lane_block?.denied_principal).toBe("megha");
+  expect(blocked?.lane_block?.allowed_principal).toBe("paisa");
+  expect(blocked?.lane_block?.allowed_decision).toBe("allow");
+  expect(blocked?.lane_block?.denied_message).toMatch(/^Cedar denied mandi\./);
 });
 it("refuses seeding or resetting a normal installation", () => {
   const s = context();

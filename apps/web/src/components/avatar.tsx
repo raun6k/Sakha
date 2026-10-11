@@ -3,7 +3,12 @@ import type { TeamId } from "../team/adapter";
 export function Avatar({ id, color }: { id: TeamId; color?: string }) {
   const ink = color ?? "#1F6F43";
   return (
-    <svg className="avatar" viewBox="0 0 72 72" aria-hidden="true">
+    <svg
+      className="avatar"
+      viewBox="0 0 72 72"
+      aria-hidden="true"
+      style={{ ["--glow" as string]: ink }}
+    >
       <circle cx="36" cy="36" r="36" fill={ink} />
       {id === "sakha" ? <Sakha /> : null}
       {id === "megha" ? <Megha /> : null}

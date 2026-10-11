@@ -1,11 +1,35 @@
+import type { LaneBlock } from "@sakha/contracts";
 import { t } from "../copy";
 import { formatUpdated } from "../farmer";
 import { useLang } from "../language";
-import { type FarmerCard, rupeeText, teammateName } from "../team/adapter";
+import {
+  type FarmerCard,
+  isTeamId,
+  rupeeText,
+  teammateName,
+} from "../team/adapter";
 import { Avatar } from "./avatar";
 
-export function AnswerCard({ card }: { card: FarmerCard }) {
+export function AnswerCard({
+  card,
+  lane,
+}: {
+  card: FarmerCard;
+  lane?: LaneBlock;
+}) {
   const { lang } = useLang();
+  const laneChip =
+    lane &&
+    lane.allowed_decision === "allow" &&
+    lane.denied_message.startsWith("Cedar denied ") &&
+    isTeamId(lane.denied_principal) &&
+    isTeamId(lane.allowed_principal)
+      ? {
+          denied: teammateName(lane.denied_principal, lang),
+          allowed: teammateName(lane.allowed_principal, lang),
+          cedar: lane.denied_message,
+        }
+      : undefined;
   const risk =
     card.risk === "high"
       ? t(lang, "riskHigh")
@@ -98,6 +122,15 @@ export function AnswerCard({ card }: { card: FarmerCard }) {
           </li>
         ))}
       </ul>
+      {laneChip ? (
+        <p className="lane-chip">
+          <strong>
+            {laneChip.denied} {t(lang, "laneCant")}, {laneChip.allowed}{" "}
+            {t(lang, "laneCan")}
+          </strong>
+          <span>{laneChip.cedar}</span>
+        </p>
+      ) : null}
       <div className="chips">
         <span className="chip checked">{t(lang, "checkedBySakha")}</span>
         {card.consulted.map((id) => (

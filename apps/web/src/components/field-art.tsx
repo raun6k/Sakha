@@ -5,7 +5,7 @@ export function FieldArt({
 }) {
   const sky =
     mood === "act"
-      ? ["#F8C56B", "#E7A04A"]
+      ? ["#E25B45", "#F2A93B"]
       : mood === "safe"
         ? ["#D7EBF8", "#E7F6EE"]
         : mood === "calm"

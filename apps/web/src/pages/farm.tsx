@@ -5,6 +5,7 @@ import { Droplets, MapPin, Sprout } from "lucide-react";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { FieldArt } from "../components/field-art";
+import { HowTeamWorks } from "../components/how-team-works";
 import { LanguageToggle } from "../components/language-toggle";
 import {
   ErrorNotice,
@@ -622,6 +623,7 @@ export function FarmPage() {
     Boolean(farmId),
   );
   const [update, setUpdate] = useState(false);
+  const [how, setHow] = useState(false);
   if (farm.isPending || facts.isPending)
     return (
       <div className="splash">
@@ -710,6 +712,17 @@ export function FarmPage() {
         <h2>{t(lang, "assistant")}</h2>
         <AssistantLine />
       </section>
+      <section className="card">
+        <h2>{t(lang, "howTeamWorks")}</h2>
+        <button
+          type="button"
+          className="button secondary"
+          onClick={() => setHow(true)}
+        >
+          {t(lang, "howTeamWorks")}
+        </button>
+      </section>
+      <HowTeamWorks open={how} onClose={() => setHow(false)} />
       <QuickUpdate open={update} onClose={() => setUpdate(false)} />
     </div>
   );

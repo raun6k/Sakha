@@ -1,60 +1,107 @@
 # Sakha
 
-Sakha is a local farming Command Center with one loopback backend and a visible farm team: Sakha leads Megha (weather), Jal (water), Kheti (crops), and Paisa (money). Farmer facts, evidence, conversations, scenarios, plans and confirmed work have separate records. Approving a plan never records irrigation, spending, sowing or a sale.
+![Kavita's home screen: Act now, a drought-coloured sky, and the farm team](docs/screenshots/home-hero.png)
 
-## Run locally
+One farm team for an Indian smallholder: Sakha leads Megha, Jal, Kheti and Paisa, and every number on the screen has a source.
 
-Use Node.js 24 LTS and pnpm 12.10.1. The lockfile records installed dependency versions. `./scripts/sakha` accepts the same arguments as `pnpm`; on this development machine it uses the tested ignored local toolchain because the default shell has Node 20. It does not change your system installation. On another checkout, install the required Node/pnpm versions first.
+## The team
+
+| Teammate | Lane | What you see |
+| --- | --- | --- |
+| Sakha | Lead | One plan for the week, after the others have spoken |
+| Megha | Weather | Open-Meteo rain and the NOAA El Niño number |
+| Jal | Water | Irrigate or wait, from rain and evaporation |
+| Kheti | Crop | Stage from the sowing date the farmer reported |
+| Paisa | Money | Mandi modal, MSP, and the rupee gap |
+
+## Architecture
+
+Sakha is the only lead. In the [Strands Agents](https://strandsagents.com/) runtime each teammate is a tool Sakha can call. [Cedar](https://www.cedarpolicy.com/) rules refuse a teammate who steps into another lane (Megha cannot read the mandi; Paisa can). Adapters return `{ data, source, fetched_at }` and fall back to the committed JSON cache. The words can come from Amazon Bedrock, OpenAI, or Codex. The seeded demo does not need a key.
+
+```mermaid
+flowchart LR
+  farmer[Farmer app]
+  api[Sakha API]
+  sakha[Sakha lead]
+  cedar[Cedar rules]
+  megha[Megha]
+  jal[Jal]
+  kheti[Kheti]
+  paisa[Paisa]
+  weather[Open-Meteo and NOAA]
+  water[Open-Meteo rain and ET0]
+  crop[Farmer facts]
+  money[Agmarknet and PIB MSP]
+  words[Bedrock or OpenAI or Codex]
+
+  farmer --> api
+  api --> sakha
+  cedar --> api
+  sakha --> megha
+  sakha --> jal
+  sakha --> kheti
+  sakha --> paisa
+  megha --> weather
+  jal --> water
+  kheti --> crop
+  paisa --> money
+  sakha --> words
+```
+
+## Quickstart
+
+Node.js 24 and pnpm 12.10.1, as in `package.json`.
 
 ```sh
-pnpm install --frozen-lockfile
+pnpm install
+cp .env.example .env
+pnpm seed:demo
 pnpm dev
+pnpm eval:agents
 ```
 
-Development uses the browser at `http://127.0.0.1:5173` and backend at `http://127.0.0.1:4310`. The frontend proxies `/api` to the backend. For a single-origin release:
+Open http://127.0.0.1:5173. The API is on http://127.0.0.1:4310. `pnpm seed:demo` writes `.local/demo/sakha.sqlite` and `pnpm dev` opens that file. Saved chats for Kavita Meshram of Kalmeshwar are on screen with no model key. Set `SAKHA_SEED_LIVE=0` to skip the network and use only `packages/data/cache`.
+
+For live wording, fill `.env` and restart `pnpm dev`:
+
+- Strands on OpenAI: `OPENAI_API_KEY` and `SAKHA_OPENAI_MODEL`
+- Strands on Amazon Bedrock: `SAKHA_STRANDS_PROVIDER=bedrock`, `SAKHA_BEDROCK_MODEL_ID`, `AWS_REGION`, and AWS credentials or `SAKHA_BEDROCK_API_KEY`
+- Codex: `SAKHA_CODEX_ENABLED=true` with an existing Codex login (`SAKHA_CODEX_MODEL` defaults to `gpt-6-luna`)
+
+A live Agmarknet pull also needs `DATA_GOV_IN_API_KEY`. Without it, prices stay on the committed cache.
+
+## Data sources
+
+| Reading in the demo | Source |
+| --- | --- |
+| 7-day rain and evaporation | [Open-Meteo forecast](https://open-meteo.com/) for 21.15 N, 79.1 E |
+| Season rain | [Open-Meteo archive](https://open-meteo.com/) and [NASA POWER](https://power.larc.nasa.gov/) |
+| El Niño, JAS 2026 ONI +2.16 °C | Committed copy of [NOAA CPC ONI](https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt) |
+| Nagpur soyabean modal ₹6,175/qtl, 7 Oct 2026 | [data.gov.in Agmarknet resource](https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070), cached after the live call did not complete |
+| Soybean (Yellow) MSP ₹5,708 | [PIB release](https://www.pib.gov.in/PressReleasePage.aspx?PRID=2260618), 13 May 2026 |
+
+Harvest labour ₹5,600 and the 19.2 quintal expectation are the farmer's own figures. The ₹12,960 benefit is the cached modal-minus-minimum gap on those quintals, not a promised sale.
+
+## Tests and eval
 
 ```sh
+pnpm typecheck
+pnpm test
+pnpm eval:agents
 pnpm build
-pnpm start
+pnpm test:browser
 ```
 
-Open `http://127.0.0.1:4310`. Release startup loads compiled JavaScript with the `sakha-release` export condition, serves the built UI, applies checksum-verified SQLite migrations and locks the selected database. `SAKHA_PORT` selects another loopback port. `SAKHA_DATABASE_PATH` selects a database; otherwise `env-paths` chooses the operating system's Sakha application-data directory. Stop the process before changing releases or using the operator CLI. Preserve the database and its WAL files together when backing up a stopped application. A migration checksum mismatch stops startup without replacing the database.
+`pnpm test` is Vitest. `pnpm eval:agents` runs the mock prompt suite: routing, the call caps, and Cedar's allow and deny checks, with no model call. `pnpm test:browser` is the Playwright pass against a local server. `pnpm test:demo` runs that same suite.
 
-There is no farmer account or password. Bootstrap creates a process-local session for API commands, evidence, downloads and SSE. A backend restart expires it. The browser renews read access; uncertain mutations retain their original idempotency key. Host/origin checks and Cedar tool authorization still apply.
+## AI tool disclosure
 
-## Runtime and public evidence
+- Cursor cloud agents, using Grok, for the integration and this polish pass.
+- **Owner: write your other tools here before you submit.**
 
-Copy `.env.example` to `.env` and fill the selected runtime configuration. Release startup, development backend and operator commands load this ignored file; exported environment variables take precedence. Keep the file private. Choose either the installed Codex runtime with `SAKHA_CODEX_ENABLED=true`, or the Strands runtime. Strands defaults to OpenAI (`OPENAI_API_KEY` and `SAKHA_OPENAI_MODEL`). Set `SAKHA_STRANDS_PROVIDER=bedrock` with `SAKHA_BEDROCK_MODEL_ID`, `AWS_REGION`, and AWS credentials or `SAKHA_BEDROCK_API_KEY` to use Amazon Bedrock instead. An optional `SAKHA_OPENAI_KEYRING_ACCOUNT` reads an existing OS-keyring credential. Codex still defaults to GPT-6 Luna (`gpt-6-luna`) with no automatic model fallback. The Codex path uses your existing Codex login and subscription allowance; it does not require an OpenAI API key. `SAKHA_CODEX_WEB_SEARCH` stays `disabled` unless set to `cached` or `live`. Public web search tries Tavily (`TAVILY_API_KEY`), then Exa (`EXA_API_KEY`, or a no-key attempt unless `SAKHA_EXA_FREE_TIER=0`), then DuckDuckGo, then a small cached snippet list. Every hit keeps a source URL and `fetched_at`. One active external-processing grant that includes conversation text unlocks chat for the whole team. Sakha never copies Codex tokens into API-key storage.
+## Attribution
 
-## Agent eval
-
-`pnpm eval:agents` runs the farmer prompt suite with no model call. It checks routing (including Hindi, the daily brief, and the charter stress prompts), the three-call and two-hop caps, Cedar's Paisa market permit and Megha market denial, and cached-source labels. `pnpm eval:agents -- --live` runs those same checks and then asks whether Strands is configured. Without a key it exits 2 and prints the variables to set. A live key can complete a real model turn in the app; this command does not spend one. Answer quality, nested specialist wording, and live Tavily, Exa, or DuckDuckGo HTTP still need that key.
-
-The Codex adapter uses the pinned installed app-server protocol, an ephemeral read-only workspace, no native shell/browser tools or general network access, and eight scoped Sakha MCP tools. Native continuation, approval escalation and image analysis are unavailable. Uploaded JPEG/PNG/WebP photos remain local; upload does not imply analysis.
-
-Core public connectors cover NOAA RONI, ENSO probabilities/outlook, Niño3.4 and DMI indices, CHIRPS v3 rainfall estimates and CHIRPS-GEFS ensemble-mean forecasts. Daily and monthly rainfall are separate products. Daily CHIRPS uses pentad disaggregation with IMERG Late V07; its 0.1° input is bilinearly resampled to the 0.05° CHIRPS grid. A native containing-cell sample is an estimate, not a farmer rain-gauge observation. Unpublished, missing or failed samples remain gaps with reasons. Preliminary daily estimates remain identified and can be replaced by final data. Forecasts retain issue and validity windows. Intermittent upstream failures degrade capability rather than supplying plausible values.
-
-Attributed curated official documents can provide qualitative district weather, regional crop guidance, historical contingency context and public scheme checklists. These retain original raw hashes, separate curated-content hashes, pages, date precision and geographic scope. Current district crop bulletins, market-price extraction, individual eligibility and state seasonal insurance enrollment remain separate gates. A market arithmetic scenario accepts supplied prices as hypotheses; it does not create a live market quote or promise proceeds.
-
-```sh
-pnpm operator farms
-pnpm operator refresh FARM_ID 30 7
-pnpm operator import FARM_ID CURATED_JSON RAW_PDF
-pnpm operator market-import FARM_ID QUOTE_JSON RAW_SOURCE
-```
-
-Refresh requires an explicitly supplied farm location; it never invents a coordinate. The operator records actual source artifacts and normalized evidence in local storage. Public source retrieval needs no farmer credentials. The CLI is an operator interface, not a farmer setup step.
-
-## Persistence and verification
-
-All multi-record commands use SQLite transactions, optimistic versions and durable idempotency records. Authoritative facts, source snapshots and original corrections remain available until confirmed deletion. The SSE journal retains the latest 5000 events per farm; an older cursor requests an authoritative resync. Transcript history and idempotency records are not aged out automatically. The scheduler runs only while the backend is awake; interrupted external turns are recorded without automatic uncertain retries.
-
-Exports are scoped local JSON downloads with an explicit private-data option and processing bounds. Nonprivate exports use a safe record allowlist and omit conversations, findings, plans, history and other potentially derived private text. Confirmed deletion clears relevant records, FTS memory, private artifacts, peer payloads, event and command caches. Queued deletion blocks new owner-service mutations. Full-farm deletion retains only scope tombstones and its completion record. Fact corrections and grant revocation clear derived memory, cancel affected active turns and mark saved findings for review.
-
-`pnpm lint`, `pnpm typecheck` and `pnpm test` check the workspace. Runtime doubles and synthetic fixtures test deterministic boundaries; they are separate from live provider/source checks. After `pnpm build`, `pnpm test:browser` checks real local HTTP/SQLite browser flows with a deterministic provider double and disposable databases. `pnpm test:demo` checks the separate synthetic UI journeys against a running web server. Shared DTOs and transport conventions live in `packages/contracts/README.md`. Private planning documents and original reference assets remain locally excluded from Git.
-
-## Reproducible presentation demo
-
-`pnpm seed:demo` loads the Kalmeshwar demo farm into `.local/demo/sakha.sqlite`: Kavita Meshram, soybean and cotton, one approved plan, and seeded replies for Sakha, Megha, Jal, Kheti and Paisa. Set `DATA_GOV_IN_API_KEY` if a live Agmarknet call should be attempted. See [demo setup and reset instructions](demo/README.md) and [adapter shapes](packages/data/README.md).
-
-The presentation server is still `./scripts/sakha build`, `./scripts/sakha-demo init`, then `./scripts/sakha-demo start` at http://127.0.0.1:4396. The legacy `?demo=1` mode remains a separate synthetic frontend test fixture.
+- Team pattern and optional model path: [Strands Agents](https://strandsagents.com/). Policy checks: [Cedar](https://www.cedarpolicy.com/) (`policies/sakha-v1.cedar`).
+- Weather, climate and prices: Open-Meteo (CC BY 4.0), NOAA CPC (US public data), NASA POWER, data.gov.in / Agmarknet, and the Press Information Bureau. Cache notes live in `packages/data/cache/`.
+- UI type: [Noto Sans and Noto Sans Devanagari](https://fonts.google.com/noto) (SIL Open Font License), shipped under `apps/web/public/fonts/`.
+- App libraries include React, Vite, Fastify, better-sqlite3, Zod, Radix, and Lucide. See the lockfile for versions.

@@ -1,8 +1,7 @@
 import * as c from "@sakha/contracts";
-import type { createCoreServices } from "@sakha/core";
-import type { DemoCache } from "@sakha/data";
-import { buildTeamSeed } from "@sakha/data";
-import type { createFarmServices } from "@sakha/farm";
+import { authorize, type createCoreServices } from "@sakha/core";
+import { buildTeamSeed, type DemoCache, type SeedMessage } from "@sakha/data";
+import { type createFarmServices, DomainError } from "@sakha/farm";
 import type { Storage } from "./storage/database.js";
 
 type Services = {
@@ -10,6 +9,37 @@ type Services = {
   farm: ReturnType<typeof createFarmServices>;
   core: ReturnType<typeof createCoreServices>;
 };
+
+function readLane(
+  farmId: string,
+  check: NonNullable<SeedMessage["lane_check"]>,
+): c.LaneBlock | undefined {
+  const resource = { id: `lane-${check.action}`, farmId };
+  const principal = (role: c.RoleKey) => ({
+    kind: "agent" as const,
+    id: role,
+    farmId,
+    roleKey: role,
+  });
+  let denied_message = "";
+  try {
+    authorize(principal(check.denied_role), check.action, resource, true);
+    return undefined;
+  } catch (error) {
+    if (!(error instanceof DomainError) || error.code !== "permission_denied")
+      throw error;
+    denied_message = error.message;
+  }
+  authorize(principal(check.allowed_role), check.action, resource, true);
+  return {
+    denied_principal: check.denied_role,
+    denied_action: check.action,
+    denied_message,
+    allowed_principal: check.allowed_role,
+    allowed_action: check.action,
+    allowed_decision: "allow",
+  };
+}
 
 export function persistTeamSeed(
   services: Services,
@@ -70,6 +100,9 @@ export function persistTeamSeed(
     );
     for (const message of thread.messages) {
       const at = stamp();
+      const lane = message.lane_check
+        ? readLane(farmId, message.lane_check)
+        : undefined;
       services.store.put(
         "message",
         c.Message.parse({
@@ -98,6 +131,7 @@ export function persistTeamSeed(
             consulted: message.consulted,
             reviewed_by: message.reviewed_by,
             card: message.card,
+            lane_block: lane,
           },
           team_id:
             message.author === "agent"
@@ -106,6 +140,7 @@ export function persistTeamSeed(
           reviewed_by: message.reviewed_by,
           consulted: message.consulted,
           card: message.card,
+          lane_block: lane,
           created_at: at,
           updated_at: at,
         }),

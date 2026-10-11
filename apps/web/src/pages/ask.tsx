@@ -340,6 +340,7 @@ export function Thread({
                     stored: message.context.card ?? message.card,
                     lang,
                   })}
+                  lane={message.context.lane_block ?? message.lane_block}
                 />
               ),
             )}

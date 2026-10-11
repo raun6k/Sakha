@@ -21,7 +21,10 @@ export function RiskMeter({
       <div className="meter-track">
         <span
           className={`meter-knob ${level}`}
-          style={{ left: position[level] }}
+          style={{
+            left: position[level],
+            ["--knob" as string]: position[level],
+          }}
         />
       </div>
       <div className="meter-legend">

@@ -192,6 +192,18 @@ const strings = {
     talk: "Talk",
     backTeam: "All teammates",
     notCited: "Not cited yet",
+    howTeamWorks: "How your team works",
+    howLead:
+      "Sakha leads four teammates. Megha watches the weather, Jal watches water, Kheti watches the crop, and Paisa watches the mandi and the rupees.",
+    howStrands:
+      "Each teammate is a tool Sakha calls. That is Strands Agents: one lead, and the others as tools.",
+    howCedar:
+      "Cedar rules keep each person in their own lane. Ask Megha for a mandi price and the rule blocks her, then Paisa answers.",
+    howNumbers:
+      "Rain comes from Open-Meteo, the El Niño number from NOAA, mandi prices from Agmarknet, and the support price from the government's PIB note. With a key, the words can come from Amazon Bedrock, OpenAI, or Codex. The saved answers in this demo work with no key.",
+    swipeHint: "Swipe for the rest of the team",
+    laneCant: "can't do this",
+    laneCan: "can",
   },
   hi: {
     home: "होम",
@@ -376,6 +388,18 @@ const strings = {
     talk: "बात करें",
     backTeam: "सारी टीम",
     notCited: "स्रोत अभी नहीं",
+    howTeamWorks: "आपकी टीम कैसे काम करती है",
+    howLead:
+      "साखा चार साथियों की अगुवाई करते हैं। मेघा मौसम देखती हैं, जल पानी, खेती फसल, और पैसा मंडी और रुपया।",
+    howStrands:
+      "हर साथी एक औज़ार है जिसे साखा बुलाते हैं। यही Strands Agents है: एक मुखिया, और बाकी उनके औज़ार।",
+    howCedar:
+      "Cedar के नियम हर साथी को अपने काम पर रखते हैं। मंडी भाव मेघा से पूछोगे तो नियम उन्हें रोकता है, और पैसा जवाब देते हैं।",
+    howNumbers:
+      "बारिश Open-Meteo से है, El Niño का अंक NOAA से, मंडी भाव Agmarknet से, और समर्थन मूल्य PIB की सूचना से। चाबी हो तो शब्द Amazon Bedrock, OpenAI, या Codex से आ सकते हैं। इस डेमो के सहेजे जवाब बिना चाबी चलते हैं।",
+    swipeHint: "बाकी टीम के लिए आगे खिसकाएँ",
+    laneCant: "यह नहीं कर सकते",
+    laneCan: "कर सकते हैं",
   },
 } as const;
 
