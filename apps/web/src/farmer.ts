@@ -213,6 +213,32 @@ export function buildRisk(home: Home) {
   };
 }
 
+/** Name the readings that actually set the risk, in the order the farmer sees them. */
+export function riskSourceLine(home: Home, lang: Lang) {
+  const rain = pickRainSeries(home.insights.series);
+  const climate = home.sections.climate.at(-1);
+  const parts: string[] = [];
+  if (rain?.source_id === "W05") parts.push(t(lang, "openMeteo"));
+  else if (rain) parts.push(sourceLabel(rain.source_id, lang));
+  const climateText = `${climate?.title ?? ""} ${climate?.summary ?? ""}`;
+  if (climate && /ni[nñ]o|oni|noaa/i.test(climateText))
+    parts.push(t(lang, "noaaEnso"));
+  else if (climate?.evidence[0])
+    parts.push(sourceLabel(climate.evidence[0].source_id, lang));
+  const risk = buildRisk(home);
+  return {
+    source: parts.length
+      ? parts.join(" · ")
+      : risk.sourceId
+        ? sourceLabel(risk.sourceId, lang)
+        : t(lang, "yourPlan"),
+    updated:
+      rain?.freshness.retrieved_at ??
+      climate?.freshness.retrieved_at ??
+      risk.updated,
+  };
+}
+
 export function riskSentence(kind: RiskKind, lang: Lang) {
   if (kind === "act") return t(lang, "riskAct");
   if (kind === "watchDry") return t(lang, "riskWatchDry");

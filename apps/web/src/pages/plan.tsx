@@ -1,24 +1,39 @@
 import type { PlanRevision } from "@sakha/contracts";
+import { Droplets, IndianRupee, Scissors } from "lucide-react";
 import { Link } from "react-router";
 import { FieldArt } from "../components/field-art";
+import { MoneyFigures } from "../components/money-figures";
 import { SourceBadge } from "../components/source-badge";
 import { ErrorNotice, State } from "../components/ui";
 import { t } from "../copy";
 import { plainSentence } from "../farmer";
 import { useLang } from "../language";
 import { useCommand, useFarmId, useRead } from "../services/context";
-import { rupeeText } from "../team/adapter";
+import { teammateName } from "../team/adapter";
+
+function stepIcon(title: string) {
+  if (/sell|mandi|price|₹/i.test(title)) return <IndianRupee size={22} />;
+  if (/water|borewell|irrigat|cotton/i.test(title))
+    return <Droplets size={22} />;
+  return <Scissors size={22} />;
+}
 
 function Steps({ revision }: { revision: PlanRevision }) {
   const { lang } = useLang();
   const steps = revision.tasks.filter((task) => task.status !== "cancelled");
   if (!steps.length) return <p>{t(lang, "whyFallback")}</p>;
   return (
-    <ol className="steps">
-      {steps.map((task) => (
-        <li key={task.id}>
-          <strong>{plainSentence(task.title, t(lang, "whyFallback"))}</strong>
-          <p>{plainSentence(task.description, t(lang, "whyFallback"))}</p>
+    <ol className="plan-steps">
+      {steps.map((task, index) => (
+        <li className="plan-step" key={task.id}>
+          <span className="step-index">{index + 1}</span>
+          <span className="step-icon" aria-hidden="true">
+            {stepIcon(task.title)}
+          </span>
+          <div>
+            <strong>{plainSentence(task.title, t(lang, "whyFallback"))}</strong>
+            <p>{plainSentence(task.description, t(lang, "whyFallback"))}</p>
+          </div>
         </li>
       ))}
     </ol>
@@ -96,30 +111,32 @@ export function PlanPage() {
         <p>{t(lang, "planLead")}</p>
       </header>
       {saved ? (
-        <section className="card">
-          <h2>{t(lang, "savedPlan")}</h2>
-          <p>
-            {plainSentence(
-              saved.tasks[0]?.title,
-              plainSentence(saved.title, t(lang, "savedPlan")),
-            )}
-          </p>
-          <h3>{t(lang, "steps")}</h3>
-          <Steps revision={saved} />
-          {saved.cost_inr !== undefined || saved.benefit_inr !== undefined ? (
+        <>
+          <section className="card plan-hero">
+            <p className="eyebrow">{t(lang, "weekPlan")}</p>
+            <h2>{t(lang, "savedPlan")}</h2>
             <p>
-              {t(lang, "cost")}{" "}
-              {rupeeText(saved.cost_inr, undefined, undefined, lang)}
-              {" · "}
-              {t(lang, "benefit")}{" "}
-              {rupeeText(saved.benefit_inr, undefined, undefined, lang)}
+              {plainSentence(
+                saved.tasks[0]?.title,
+                plainSentence(saved.title, t(lang, "savedPlan")),
+              )}
             </p>
-          ) : null}
-          <SourceBadge
-            source={t(lang, "yourPlan")}
-            updated={saved.updated_at}
-          />
-        </section>
+            <MoneyFigures cost={saved.cost_inr} benefit={saved.benefit_inr} />
+            <div className="chips">
+              <span className="chip checked">{t(lang, "checkedBySakha")}</span>
+              {(["megha", "jal", "kheti", "paisa"] as const).map((id) => (
+                <span className="chip" key={id}>
+                  {teammateName(id, lang)}
+                </span>
+              ))}
+            </div>
+            <SourceBadge
+              source={t(lang, "yourPlan")}
+              updated={saved.updated_at}
+            />
+          </section>
+          <Steps revision={saved} />
+        </>
       ) : null}
       {proposals.map((revision) => (
         <Suggestion

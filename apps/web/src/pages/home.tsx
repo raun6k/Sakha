@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { AnswerCard } from "../components/answer-card";
 import { DailyBrief } from "../components/daily-brief";
 import { FieldArt } from "../components/field-art";
+import { MoneyFigures } from "../components/money-figures";
 import { RainChart } from "../components/rain-chart";
 import { RiskMeter } from "../components/risk-meter";
 import { SourceBadge } from "../components/source-badge";
@@ -18,6 +19,7 @@ import {
   rainCaption,
   rainTotal,
   riskSentence,
+  riskSourceLine,
 } from "../farmer";
 import { useLang } from "../language";
 import { useFarmId, useRead } from "../services/context";
@@ -75,6 +77,7 @@ export function HomePage() {
       : risk.level === "safe"
         ? t(lang, "safe")
         : t(lang, "watch");
+  const riskLine = riskSourceLine(home, lang);
   return (
     <div className="route-content">
       <section className={`hero hero-${risk.level}`}>
@@ -87,11 +90,16 @@ export function HomePage() {
           <h1>{riskLevel}</h1>
           <p className="hero-sentence">{riskSentence(risk.kind, lang)}</p>
           <RiskMeter level={risk.level} lang={lang} />
-          <SourceBadge
-            source={sourceLabel(risk.sourceId, lang, catalog(risk.sourceId))}
-            updated={risk.updated}
-          />
+          <SourceBadge source={riskLine.source} updated={riskLine.updated} />
         </div>
+      </section>
+      <section className="card week-plan">
+        <p className="eyebrow">{t(lang, "weekPlan")}</p>
+        <h2>{advice.headline}</h2>
+        <MoneyFigures cost={advice.cost_inr} benefit={advice.benefit_inr} />
+        <Link className="button" to="/plan">
+          {t(lang, "seePlan")}
+        </Link>
       </section>
       <DailyBrief team={team} />
       <Link className="button ask-button" to="/team">

@@ -190,12 +190,12 @@ test("mobile team keeps every teammate on screen and old routes leave the comman
   }
   await page.goto(`${origin}/team`);
   await expect(
-    page.getByRole("heading", { name: "Your farm team" }),
+    page.getByRole("heading", { name: "Sakha · Team lead" }),
   ).toBeVisible();
   await expect(page.getByText("Megha").first()).toBeVisible();
   await page.goto(`${origin}/agents/legacy`);
   await expect(
-    page.getByRole("heading", { name: "Your farm team" }),
+    page.getByRole("heading", { name: "Sakha · Team lead" }),
   ).toBeVisible();
   await page.goto(origin);
   expect(

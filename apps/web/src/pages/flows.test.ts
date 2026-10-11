@@ -147,8 +147,8 @@ describe("home, team and rain", () => {
     for (const name of ["Sakha", "Megha", "Jal", "Kheti", "Paisa"])
       expect(screen.getAllByText(name).length).toBeGreaterThan(0);
     expect(screen.getByText("Checked by Sakha")).toBeTruthy();
-    expect(screen.getByText("Cost ₹")).toBeTruthy();
-    expect(screen.getByText("Benefit ₹")).toBeTruthy();
+    expect(screen.getAllByText("Cost").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Benefit").length).toBeGreaterThan(0);
     const axis = document.querySelector(".rain-y")?.textContent ?? "";
     expect(axis).toContain("0");
     expect(axis).toContain("6");
@@ -156,7 +156,7 @@ describe("home, team and rain", () => {
   });
   it("opens teammate chats from the team tab", async () => {
     mount(h(TeamPage));
-    await screen.findByRole("heading", { name: "Your farm team" });
+    await screen.findByRole("heading", { name: "Sakha · Team lead" });
     expect(screen.getAllByRole("link", { name: /Talk/ })).toHaveLength(4);
   });
   it("keeps four farmer tabs", async () => {

@@ -44,7 +44,14 @@ export function DailyBrief({ team }: { team: TeammateView[] }) {
             <Avatar id={mate.id} color={mate.color} />
             <strong>{mate.name}</strong>
             <span className="team-role">{mate.role}</span>
-            <em>{mate.status}</em>
+            <em
+              className="status-pill"
+              style={{
+                background: `color-mix(in srgb, ${mate.color} 16%, white)`,
+              }}
+            >
+              {mate.status}
+            </em>
           </Link>
         ))}
       </div>

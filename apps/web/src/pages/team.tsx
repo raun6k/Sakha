@@ -86,9 +86,21 @@ export function TeamPage() {
       <header className="mate-head">
         <Avatar id="sakha" color="#1F6F43" />
         <div>
-          <h1>{t(lang, "yourTeam")}</h1>
-          <p>{current?.role}</p>
-          <p>{current?.status}</p>
+          <p className="eyebrow">{t(lang, "yourTeam")}</p>
+          <h1>{t(lang, "sakhaLead")}</h1>
+          <p className="status-pill">{current?.status}</p>
+          <button
+            type="button"
+            className="button"
+            onClick={() =>
+              document.getElementById("sakha-chat")?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              })
+            }
+          >
+            {t(lang, "talkToSakha")}
+          </button>
         </div>
         <button
           type="button"
@@ -109,16 +121,25 @@ export function TeamPage() {
             style={{ borderColor: item.color }}
           >
             <Avatar id={item.id} color={item.color} />
-            <div>
+            <div className="mate-copy">
               <strong>{item.name}</strong>
-              <p>{item.role}</p>
-              <p>{item.status}</p>
+              <p className="team-role">{item.role}</p>
+              <p
+                className="status-pill"
+                style={{
+                  background: `color-mix(in srgb, ${item.color} 16%, white)`,
+                }}
+              >
+                {item.status}
+              </p>
             </div>
             <span className="button secondary">{t(lang, "talk")}</span>
           </Link>
         ))}
       </div>
-      <Thread role={role.data} mate="sakha" embedded />
+      <div id="sakha-chat">
+        <Thread role={role.data} mate="sakha" embedded />
+      </div>
     </div>
   );
 }
